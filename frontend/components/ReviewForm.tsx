@@ -22,7 +22,7 @@ export default function ReviewForm({ onSubmit }: ReviewFormProps) {
       <h3 className="text-xl font-bold mb-4">Leave a Review</h3>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-2">Item Name</label>
+          <label className="block text-sm font-medium mb-2">User Name</label>
           <input
             type="text"
             value={name}
