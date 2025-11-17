@@ -4,6 +4,7 @@ export interface Item {
   category: string;
   price: number;
   images?: string[];
+  claimed?: boolean;
 }
 
 export interface Review {
