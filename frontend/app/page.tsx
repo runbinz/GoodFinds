@@ -1,11 +1,4 @@
 'use client';
-import { useState } from 'react';
-import { Item, Review, items, categories } from '../types';
-import Header from '@/components/Header';
-import Catalog from '@/components/Catalog';
-import ProfilePage from '@/components/ProfilePage';
-import SearchBar from '@/components/SearchBar';
-import HomePage from '@/components/HomePage';
 
 export default function Home() {
   const [page, setPage] = useState('home');
@@ -50,12 +43,10 @@ export default function Home() {
     }
   };
 
+export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header currentPage={page} onPageChange={setPage} />
-      <div className="max-w-6xl mx-auto p-6">
-        {renderPage()}
-      </div>
+      <HomePage onBrowseCatalog={() => (window.location.href = "/catalog")} />
     </div>
   );
 }
