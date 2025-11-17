@@ -1,16 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query
-from bson import ObjectId
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 from datetime import datetime
-from db import database
+from pydantic import BaseModel
+from db import get_posts_collection
 from models import Post
 
-# create router
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 class CreatePostRequest(BaseModel):
-    # Request body for creating a new post
     user_id: str
     item_title: str 
     description: Optional[str] = None
@@ -20,11 +17,9 @@ class CreatePostRequest(BaseModel):
     location: str
 
 class ClaimPostRequest(BaseModel):
-    # Request body for claiming a post
     user_id: str
 
 def post_to_response(post_doc) -> Post:
-    # Convert MongoDB document to Pydantic model
     return Post(
         id=str(post_doc["_id"]),
         item_title=post_doc["item_title"],
@@ -41,7 +36,7 @@ def post_to_response(post_doc) -> Post:
 
 @router.post("", response_model=Post, status_code=201)
 async def create_post(post: CreatePostRequest):
-    ''' Create a new post '''
+    posts_collection = get_posts_collection()
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
@@ -54,3 +49,18 @@ async def create_post(post: CreatePostRequest):
         "claimed_by": None,
         "status": "available"
     }
+    result = await posts_collection.insert_one(post_doc)
+    created_post = await posts_collection.find_one({"_id": result.inserted_id})
+    return post_to_response(created_post)
+
+@router.get("", response_model=List[Post])
+async def get_all_posts():
+    try:
+        posts_collection = get_posts_collection()
+        cursor = posts_collection.find({})
+        posts = []
+        async for post_doc in cursor:
+            posts.append(post_to_response(post_doc))
+        return posts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
