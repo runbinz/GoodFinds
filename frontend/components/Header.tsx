@@ -3,33 +3,10 @@ import React from 'react';
 import { Home, Grid, User } from 'lucide-react';
 import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/nextjs';
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Home, Grid, User, LogIn, UserPlus, LogOut } from "lucide-react";
-
-export default function Header() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  const checkLogin = () => {
-    const token = localStorage.getItem("token");
-    setIsLoggedIn(!!token);
-  };
-
-  useEffect(() => {
-    checkLogin();
-
-    const handler = () => {
-      checkLogin();
-    };
-
-    window.addEventListener("auth-change", handler);
-    return () => window.removeEventListener("auth-change", handler);
-  }, []);
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    window.dispatchEvent(new Event("auth-change"));
-  };
+interface HeaderProps {
+  currentPage: string;
+  onPageChange: (page: string) => void;
+}
 
 export default function Header({ currentPage, onPageChange }: HeaderProps) {
   const { isSignedIn } = useUser();
@@ -44,9 +21,11 @@ export default function Header({ currentPage, onPageChange }: HeaderProps) {
             className="flex items-center gap-2 hover:bg-emerald-700 px-3 py-2 rounded transition-colors"
           >
             <Home size={20} /> Home
-          </Link>
-
-          <Link href="/catalog" className="flex items-center gap-2 hover:bg-emerald-700 px-3 py-2 rounded">
+          </button>
+          <button 
+            onClick={() => onPageChange('catalog')} 
+            className="flex items-center gap-2 hover:bg-emerald-700 px-3 py-2 rounded transition-colors"
+          >
             <Grid size={20} /> Catalog
           </button>
           

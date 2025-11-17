@@ -3,6 +3,7 @@ export interface Item {
   name: string;
   category: string;
   price: number;
+  images?: string[];
 }
 
 export interface Review {
