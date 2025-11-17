@@ -40,13 +40,6 @@ export default function Home() {
       case 'catalog':
         return (
           <div>
-            <SearchBar
-              search={search}
-              onSearchChange={setSearch}
-              category={category}
-              onCategoryChange={setCategory}
-              categories={categories}
-            />
             <Catalog items={filteredItems} />
           </div>
         );
