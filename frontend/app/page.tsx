@@ -1,52 +1,48 @@
 'use client';
 
-export default function Home() {
-  const [page, setPage] = useState('home');
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('All');
+import { useState } from 'react';
+import Header from '@/components/Header';
+import HomePage from '@/components/HomePage';
+import Catalog from '@/components/Catalog';
+import ProfilePage from '@/components/ProfilePage';
+import { Item, Review, items } from '@/types';
+
+
+export default function Page() {
+  const [currentPage, setCurrentPage] = useState('home');
   const [reviews, setReviews] = useState<Review[]>([]);
 
-  const filteredItems = items.filter(item => {
-    const match = item.name.toLowerCase().includes(search.toLowerCase());
-    const cat = category === 'All' || item.category === category;
-    return match && cat;
-  });
-
-  const addReview = (name: string, rating: number, comment: string) => {
+  const handleAddReview = (name: string, rating: number, comment: string) => {
     if (!name || !comment) return;
-    setReviews([
-      { 
-        id: Date.now(), 
-        itemName: name, 
-        rating, 
-        comment, 
-        date: new Date().toISOString().split('T')[0] 
-      }, 
-      ...reviews
-    ]);
+    
+    const newReview: Review = {
+      id: Date.now(),
+      itemName: name,
+      rating,
+      comment,
+      date: new Date().toISOString().split('T')[0],
+    };
+    
+    setReviews([newReview, ...reviews]);
   };
 
-  const renderPage = () => {
-    switch (page) {
-      case 'home':
-        return <HomePage onBrowseCatalog={() => setPage('catalog')} />;
-      case 'catalog':
-        return (
-          <div>
-            <Catalog items={filteredItems} />
-          </div>
-        );
-      case 'profile':
-        return <ProfilePage reviews={reviews} onAddReview={addReview} />;
-      default:
-        return null;
-    }
-  };
-
-export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
-      <HomePage onBrowseCatalog={() => (window.location.href = "/catalog")} />
+      <Header currentPage={currentPage} onPageChange={setCurrentPage} />
+      
+      <main className="max-w-6xl mx-auto p-6">
+        {currentPage === 'home' && (
+          <HomePage onBrowseCatalog={() => setCurrentPage('catalog')} />
+        )}
+        
+        {currentPage === 'catalog' && (
+          <Catalog items={items} />
+        )}
+        
+        {currentPage === 'profile' && (
+          <ProfilePage reviews={reviews} onAddReview={handleAddReview} />
+        )}
+      </main>
     </div>
   );
 }
