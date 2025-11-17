@@ -3,7 +3,7 @@ from bson import ObjectId
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
-from db import database
+import db
 from models import Post
 
 # create router
@@ -54,3 +54,8 @@ async def create_post(post: CreatePostRequest):
         "claimed_by": None,
         "status": "available"
     }
+
+    result = await db.database.posts.insert_one(post_doc)
+    post_doc["_id"] = result.inserted_id
+
+    return post_to_response(post_doc)
