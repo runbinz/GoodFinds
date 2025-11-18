@@ -174,7 +174,6 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
               placeholder="0.00"
               min="0"
             />
-            <p className="text-xs text-gray-500 mt-1">Enter price with up to 2 decimal places</p>
           </div>
 
           <div>
