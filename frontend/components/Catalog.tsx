@@ -115,7 +115,8 @@ export default function Catalog({ items }: CatalogProps) {
             
             <h2 className="text-2xl font-bold mb-4">{selectedItem.name}</h2>
             <p className="text-gray-600 mb-2">Category: {selectedItem.category}</p>
-            <p className="text-3xl font-bold text-emerald-600 mb-4">${selectedItem.price}</p>
+            <p className="text-3xl font-bold text-emerald-600 mb-4">${selectedItem.price.toFixed(2)}</p>
+            <p className="text-gray-700 mb-4">{selectedItem.description}</p>
             
             {/* Claim Status Display */}
             {selectedItem.claimed && (
