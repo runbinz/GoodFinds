@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 from datetime import datetime
 
@@ -36,12 +36,33 @@ class Review(BaseModel):
 
 
 class CreatePostRequest(BaseModel):
-    item_title: str
+    item_title: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = None
-    images: List[str] = []
+    images: List[str] = Field(default=[], max_length=9)
     category: Optional[str] = None
     condition: str
     location: str
+
+    @field_validator('item_title')
+    @classmethod
+    def validate_title(cls, v):
+        if not v or len(v.strip()) == 0:
+            raise ValueError('Title cannot be empty')
+        if len(v) > 100:
+            raise ValueError('Title must be 100 characters or less')
+        return v
+
+    @field_validator('images')
+    @classmethod
+    def validate_images(cls, v):
+        if len(v) > 9:
+            raise ValueError('Cannot upload more than 9 images')
+        
+        valid_extensions = ['.jpg', '.jpeg', '.png']
+        for img in v:
+            if not any(img.lower().endswith(ext) for ext in valid_extensions):
+                raise ValueError(f'Invalid image format. Only JPG and PNG files are allowed')
+        return v
 
 
 class UpdatePostRequest(BaseModel):
