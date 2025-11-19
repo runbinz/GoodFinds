@@ -1,51 +1,24 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
-from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
 import db
-from models import Post
+from models import Post, CreatePostRequest, ClaimPostRequest
+from utils import post_doc_to_model
+from auth import get_current_user
 
-# create router
 router = APIRouter(prefix="/posts", tags=["posts"])
 
-class CreatePostRequest(BaseModel):
-    # Request body for creating a new post
-    user_id: str
-    item_title: str 
-    description: Optional[str] = None
-    images: List[str] = []
-    category: Optional[str] = None
-    condition: str
-    location: str
-
-class ClaimPostRequest(BaseModel):
-    # Request body for claiming a post
-    user_id: str
-
-def post_to_response(post_doc) -> Post:
-    # Convert MongoDB document to Pydantic model
-    return Post(
-        id=str(post_doc["_id"]),
-        item_title=post_doc["item_title"],
-        description=post_doc.get("description"),
-        owner_id=post_doc["owner_id"],
-        created_at=post_doc["created_at"],
-        images=post_doc.get("images", []),
-        category=post_doc.get("category"),
-        condition=post_doc["condition"],
-        location=post_doc["location"],
-        claimed_by=post_doc.get("claimed_by"),
-        status=post_doc["status"]
-    )
 
 @router.post("", response_model=Post, status_code=201)
-async def create_post(post: CreatePostRequest):
-    ''' Create a new post '''
+async def create_post(
+    post: CreatePostRequest,
+    current_user: dict = Depends(get_current_user)
+):
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
-        "owner_id": post.user_id,
+        "owner_id": current_user["id"],
         "created_at": datetime.utcnow(),
         "images": post.images,
         "category": post.category,
@@ -58,4 +31,74 @@ async def create_post(post: CreatePostRequest):
     result = await db.database.posts.insert_one(post_doc)
     post_doc["_id"] = result.inserted_id
 
-    return post_to_response(post_doc)
+    return post_doc_to_model(post_doc)
+
+
+@router.get("", response_model=List[Post])
+async def search_posts(
+    category: Optional[str] = Query(None),
+    location: Optional[str] = Query(None),
+    condition: Optional[str] = Query(None),
+    status: Optional[str] = Query("available"),
+    limit: int = Query(50, le=100)
+):
+    query = {}
+    
+    if category:
+        query["category"] = category
+    if location:
+        query["location"] = {"$regex": location, "$options": "i"}
+    if condition:
+        query["condition"] = condition
+    if status:
+        query["status"] = status
+    
+    cursor = db.database.posts.find(query).limit(limit).sort("created_at", -1)
+    posts = await cursor.to_list(length=limit)
+    
+    return [post_doc_to_model(post) for post in posts]
+
+
+@router.get("/{post_id}", response_model=Post)
+async def get_post(post_id: str):
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    post = await db.database.posts.find_one({"_id": ObjectId(post_id)})
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    return post_doc_to_model(post)
+
+
+@router.patch("/{post_id}/claim", response_model=Post)
+async def claim_post(
+    post_id: str,
+    claim_request: ClaimPostRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    post = await db.database.posts.find_one({"_id": ObjectId(post_id)})
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    if post["status"] != "available":
+        raise HTTPException(status_code=400, detail="Post is not available")
+    
+    if post["owner_id"] == current_user["id"]:
+        raise HTTPException(status_code=400, detail="Cannot claim your own post")
+    
+    result = await db.database.posts.find_one_and_update(
+        {"_id": ObjectId(post_id)},
+        {"$set": {
+            "claimed_by": current_user["id"],
+            "status": "claimed"
+        }},
+        return_document=True
+    )
+    
+    return post_doc_to_model(result)
