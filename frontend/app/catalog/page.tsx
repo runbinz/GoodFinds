@@ -15,7 +15,7 @@ export default function CatalogPage() {
     return match && cat;
   });
 
-  return (
+  return ( 
     <div>
       <SearchBar
         search={search}
