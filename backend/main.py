@@ -18,8 +18,6 @@ import db
 from routes.posts import router as posts_router
 from routes.reviews import router as reviews_router
 from routes.users import router as users_router
-# Note: auth_routes commented out for now - will be refactored for Clerk later
-# from routes.auth_routes import router as auth_router
 
 
 @asynccontextmanager
@@ -52,7 +50,6 @@ app.add_middleware(
 app.include_router(posts_router)
 app.include_router(reviews_router)
 app.include_router(users_router)
-# app.include_router(auth_router)  # TODO: Refactor for Clerk, then uncomment
 
 
 @app.get("/")

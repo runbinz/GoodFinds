@@ -31,23 +31,3 @@ async def get_user_reputation(user_id: str):
     
     return user_doc_to_model(user)
 
-
-@router.get("/{user_id}/posts")
-async def get_user_posts(user_id: str):
-    """
-    Get all posts created by a user.
-    
-    TODO: Implement if needed for your use cases
-    """
-    raise HTTPException(status_code=501, detail="Get user posts not implemented yet")
-
-
-@router.get("/{user_id}/claimed")
-async def get_user_claimed_items(user_id: str):
-    """
-    Get all items claimed by a user.
-    Useful for "claimed item history" mentioned in Use Case 3.
-    
-    TODO: Implement if needed for your use cases
-    """
-    raise HTTPException(status_code=501, detail="Get claimed items not implemented yet")
