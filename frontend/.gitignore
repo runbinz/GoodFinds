@@ -12,26 +12,38 @@
 
 # testing
 /coverage
+*.test.js.snap
+jest-coverage/
 
 # next.js
 /.next/
 /out/
+.next
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
 *.pem
+.AppleDouble
+.LSOverride
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+lerna-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
 
 # vercel
 .vercel
@@ -40,5 +52,18 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# clerk configuration (can include secrets)
+# clerk configuration
 /.clerk/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# Turbopack
+.turbo
+
+# ESLint
+.eslintcache
