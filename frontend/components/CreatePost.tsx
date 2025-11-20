@@ -10,8 +10,7 @@ interface CreatePostProps {
 export default function CreatePost({ show, onClose, onCreatePost }: CreatePostProps) {
   const [newItem, setNewItem] = useState({ 
     name: '', 
-    category: 'All', 
-    price: '',
+    category: 'All',
     description: ''
   });
   const [newItemImages, setNewItemImages] = useState<string[]>([]);
@@ -66,29 +65,8 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     }
   };
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    
-    if (value === '') {
-      setNewItem({ ...newItem, price: value });
-      return;
-    }
-    
-    if (!/^\d*\.?\d*$/.test(value)) {
-      return;
-    }
-    
-    const decimalParts = value.split('.');
-    if (decimalParts.length > 1 && decimalParts[1].length > 2) {
-      const truncatedValue = `${decimalParts[0]}.${decimalParts[1].slice(0, 2)}`;
-      setNewItem({ ...newItem, price: truncatedValue });
-    } else {
-      setNewItem({ ...newItem, price: value });
-    }
-  };
-
   const handleSubmit = () => {
-    if (!newItem.name.trim() || !newItem.price) {
+    if (!newItem.name.trim()) {
       alert('Please fill in all fields');
       return;
     }
@@ -98,25 +76,22 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
       return;
     }
 
-    const formattedPrice = parseFloat(parseFloat(newItem.price).toFixed(2));
-
     const item: Item = {
       id: Date.now(),
       name: newItem.name.trim(),
       category: newItem.category,
-      price: formattedPrice,
       images: newItemImages,
       claimed: false,
       description: newItem.description.trim() || undefined,
     };
 
     onCreatePost(item);
-    setNewItem({ name: '', category: 'All', price: '', description: '' });
+    setNewItem({ name: '', category: 'All', description: '' });
     setNewItemImages([]);
   };
 
   const handleClose = () => {
-    setNewItem({ name: '', category: 'All', price: '', description: '' });
+    setNewItem({ name: '', category: 'All', description: '' });
     setNewItemImages([]);
     onClose();
   };
@@ -161,19 +136,6 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
               <option value="Sports">Sports</option>
               <option value="Home">Home</option>
             </select>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium mb-1">Price</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newItem.price}
-              onChange={handlePriceChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500"
-              placeholder="0.00"
-              min="0"
-            />
           </div>
 
           <div>
@@ -255,7 +217,7 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
             <button
               onClick={handleSubmit}
               className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded font-medium hover:bg-emerald-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              disabled={newItemImages.length === 0 || !newItem.name.trim() || !newItem.price}
+              disabled={newItemImages.length === 0 || !newItem.name.trim()}
             >
               Create
             </button>

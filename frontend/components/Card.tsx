@@ -27,7 +27,6 @@ export default function Card({ item, onClick }: CardProps) {
       <div className="p-6">
         <h3 className="font-semibold text-lg mb-2">{item.name}</h3>
         <div className="text-sm text-gray-600 mb-2">{item.category}</div>
-        <div className="text-2xl font-bold text-emerald-600">${item.price.toFixed(2)}</div>
       </div>
     </div>
   );
