@@ -10,8 +10,8 @@ interface CreatePostProps {
 export default function CreatePost({ show, onClose, onCreatePost }: CreatePostProps) {
   const [newItem, setNewItem] = useState({ 
     name: '', 
-    category: 'All', 
-    price: '' 
+    category: 'All',
+    description: ''
   });
   const [newItemImages, setNewItemImages] = useState<string[]>([]);
 
@@ -51,28 +51,47 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     setNewItemImages(prev => prev.filter((_, i) => i !== index));
   };
 
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value.length <= 20) {
+      setNewItem({ ...newItem, name: value });
+    }
+  };
+
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    if (value.length <= 200) {
+      setNewItem({ ...newItem, description: value });
+    }
+  };
+
   const handleSubmit = () => {
-    if (!newItem.name || !newItem.price) {
+    if (!newItem.name.trim()) {
       alert('Please fill in all fields');
+      return;
+    }
+
+    if (newItemImages.length === 0) {
+      alert('Please upload at least one photo');
       return;
     }
 
     const item: Item = {
       id: Date.now(),
-      name: newItem.name,
+      name: newItem.name.trim(),
       category: newItem.category,
-      price: parseFloat(newItem.price),
-      images: newItemImages.length > 0 ? newItemImages : undefined,
+      images: newItemImages,
       claimed: false,
+      description: newItem.description.trim() || undefined,
     };
 
     onCreatePost(item);
-    setNewItem({ name: '', category: 'All', price: '' });
+    setNewItem({ name: '', category: 'All', description: '' });
     setNewItemImages([]);
   };
 
   const handleClose = () => {
-    setNewItem({ name: '', category: 'All', price: '' });
+    setNewItem({ name: '', category: 'All', description: '' });
     setNewItemImages([]);
     onClose();
   };
@@ -80,19 +99,28 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={handleClose}>
-      <div className="bg-white rounded-lg p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={handleClose}>
+      <div className="bg-white rounded-lg p-6 max-w-md w-full my-8" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold mb-4">Create New Post</h2>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Item Name</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium">Item Name</label>
+              <span className="text-xs text-gray-500">
+                {newItem.name.length}/20
+              </span>
+            </div>
             <input
               type="text"
               value={newItem.name}
-              onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+              onChange={handleNameChange}
               className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500"
               placeholder="Enter item name"
+              maxLength={20}
             />
+            {newItem.name.length === 20 && (
+              <p className="text-xs text-red-500 mt-1">Maximum 20 characters reached</p>
+            )}
           </div>
           
           <div>
@@ -109,23 +137,31 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
               <option value="Home">Home</option>
             </select>
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium mb-1">Price</label>
-            <input
-              type="number"
-              step="0.01"
-              value={newItem.price}
-              onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500"
-              placeholder="0.00"
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium">Description (Optional)</label>
+              <span className="text-xs text-gray-500">
+                {newItem.description.length}/200
+              </span>
+            </div>
+            <textarea
+              value={newItem.description}
+              onChange={handleDescriptionChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500 resize-none"
+              placeholder="Enter item description"
+              rows={3}
+              maxLength={200}
             />
+            {newItem.description.length === 200 && (
+              <p className="text-xs text-red-500 mt-1">Maximum 200 characters reached</p>
+            )}
           </div>
 
           {/* Image Upload Section */}
           <div>
             <label className="block text-sm font-medium mb-1">
-              Images ({newItemImages.length}/9)
+              Images * ({newItemImages.length}/9)
             </label>
             <div className="border border-dashed border-gray-300 rounded p-4">
               {newItemImages.length > 0 && (
@@ -154,9 +190,12 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
                   <div className="flex flex-col items-center justify-center py-4">
                     <div className="text-2xl mb-2 text-gray-400">+</div>
                     <p className="text-sm text-gray-500 text-center">
-                      Click to upload images
+                      {newItemImages.length === 0 ? 'Click to upload images (at least 1 required)' : 'Click to upload more images'}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">PNG or JPG</p>
+                    {newItemImages.length === 0 && (
+                      <p className="text-xs text-red-500 mt-1">* At least one photo is required</p>
+                    )}
                   </div>
                   <input
                     type="file"
@@ -177,7 +216,8 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
           <div className="flex gap-3 mt-6">
             <button
               onClick={handleSubmit}
-              className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded font-medium hover:bg-emerald-600"
+              className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded font-medium hover:bg-emerald-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              disabled={newItemImages.length === 0 || !newItem.name.trim()}
             >
               Create
             </button>
