@@ -1,234 +1,171 @@
 import React, { useState } from 'react';
-import { Item } from '../types';
+import { X } from 'lucide-react';
+
+const categories = ['Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
+const conditions = ['New', 'Like New', 'Used', 'For Parts'];
 
 interface CreatePostProps {
   show: boolean;
   onClose: () => void;
-  onCreatePost: (item: Item) => void;
+  onCreatePost: (item: {
+    item_title: string;
+    description?: string;
+    images: string[];
+    category?: string;
+    condition: string;
+    location: string;
+  }) => void;
 }
 
 export default function CreatePost({ show, onClose, onCreatePost }: CreatePostProps) {
-  const [newItem, setNewItem] = useState({ 
-    name: '', 
-    category: 'All',
-    description: ''
-  });
-  const [newItemImages, setNewItemImages] = useState<string[]>([]);
-
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (!files) return;
-
-    const totalImages = newItemImages.length + files.length;
-    if (totalImages > 9) {
-      alert('You can only upload up to 9 images');
-      return;
-    }
-
-    const newImages: string[] = [];
-    const validFileTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    
-    Array.from(files).forEach(file => {
-      if (!validFileTypes.includes(file.type)) {
-        alert(`File "${file.name}" is not a valid image type. Please upload only PNG or JPG files.`);
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          newImages.push(e.target.result as string);
-          if (newImages.length === Array.from(files).filter(f => validFileTypes.includes(f.type)).length) {
-            setNewItemImages(prev => [...prev, ...newImages]);
-          }
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeImage = (index: number) => {
-    setNewItemImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (value.length <= 20) {
-      setNewItem({ ...newItem, name: value });
-    }
-  };
-
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    if (value.length <= 200) {
-      setNewItem({ ...newItem, description: value });
-    }
-  };
-
-  const handleSubmit = () => {
-    if (!newItem.name.trim()) {
-      alert('Please fill in all fields');
-      return;
-    }
-
-    if (newItemImages.length === 0) {
-      alert('Please upload at least one photo');
-      return;
-    }
-
-    const item: Item = {
-      id: Date.now(),
-      name: newItem.name.trim(),
-      category: newItem.category,
-      images: newItemImages,
-      claimed: false,
-      description: newItem.description.trim() || undefined,
-    };
-
-    onCreatePost(item);
-    setNewItem({ name: '', category: 'All', description: '' });
-    setNewItemImages([]);
-  };
-
-  const handleClose = () => {
-    setNewItem({ name: '', category: 'All', description: '' });
-    setNewItemImages([]);
-    onClose();
-  };
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState(categories[0]);
+  const [condition, setCondition] = useState(conditions[0]);
+  const [location, setLocation] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
 
   if (!show) return null;
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!title.trim() || !location.trim()) {
+      alert('Please fill in required fields (title and location)');
+      return;
+    }
+
+    const newItem = {
+      item_title: title,
+      description: description || undefined,
+      images: imageUrl ? [imageUrl] : [],
+      category: category || undefined,
+      condition: condition,
+      location: location,
+    };
+
+    console.log('Submitting new item:', newItem);
+    onCreatePost(newItem);
+
+    // Reset form
+    setTitle('');
+    setDescription('');
+    setCategory(categories[0]);
+    setCondition(conditions[0]);
+    setLocation('');
+    setImageUrl('');
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto" onClick={handleClose}>
-      <div className="bg-white rounded-lg p-6 max-w-md w-full my-8" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-xl font-bold mb-4">Create New Post</h2>
-        <div className="space-y-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={onClose}>
+      <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Create New Post</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <X size={24} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium">Item Name</label>
-              <span className="text-xs text-gray-500">
-                {newItem.name.length}/20
-              </span>
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Title *
+            </label>
             <input
               type="text"
-              value={newItem.name}
-              onChange={handleNameChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500"
-              placeholder="Enter item name"
-              maxLength={20}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="Item name"
+              required
             />
-            {newItem.name.length === 20 && (
-              <p className="text-xs text-red-500 mt-1">Maximum 20 characters reached</p>
-            )}
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium mb-1">Category</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 h-24"
+              placeholder="Item description"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category
+            </label>
             <select
-              value={newItem.category}
-              onChange={(e) => setNewItem({ ...newItem, category: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             >
-              <option value="All">None</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Food">Food</option>
-              <option value="Sports">Sports</option>
-              <option value="Home">Home</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
           </div>
 
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium">Description (Optional)</label>
-              <span className="text-xs text-gray-500">
-                {newItem.description.length}/200
-              </span>
-            </div>
-            <textarea
-              value={newItem.description}
-              onChange={handleDescriptionChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded focus:border-emerald-500 resize-none"
-              placeholder="Enter item description"
-              rows={3}
-              maxLength={200}
-            />
-            {newItem.description.length === 200 && (
-              <p className="text-xs text-red-500 mt-1">Maximum 200 characters reached</p>
-            )}
-          </div>
-
-          {/* Image Upload Section */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Images * ({newItemImages.length}/9)
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Condition
             </label>
-            <div className="border border-dashed border-gray-300 rounded p-4">
-              {newItemImages.length > 0 && (
-                <div className="grid grid-cols-3 gap-2 mb-4">
-                  {newItemImages.map((image, index) => (
-                    <div key={index} className="relative">
-                      <img 
-                        src={image} 
-                        alt={`Upload ${index + 1}`}
-                        className="w-full h-20 object-cover rounded"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              
-              {newItemImages.length < 9 && (
-                <label className="flex flex-col items-center justify-center cursor-pointer">
-                  <div className="flex flex-col items-center justify-center py-4">
-                    <div className="text-2xl mb-2 text-gray-400">+</div>
-                    <p className="text-sm text-gray-500 text-center">
-                      {newItemImages.length === 0 ? 'Click to upload images (at least 1 required)' : 'Click to upload more images'}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">PNG or JPG</p>
-                    {newItemImages.length === 0 && (
-                      <p className="text-xs text-red-500 mt-1">* At least one photo is required</p>
-                    )}
-                  </div>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".png,.jpg,.jpeg,image/png,image/jpg,image/jpeg"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    disabled={newItemImages.length >= 9}
-                  />
-                </label>
-              )}
-            </div>
-            {newItemImages.length >= 9 && (
-              <p className="text-sm text-gray-500 mt-2">Maximum 9 images reached</p>
-            )}
+            <select
+              value={condition}
+              onChange={(e) => setCondition(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            >
+              {conditions.map(cond => (
+                <option key={cond} value={cond}>{cond}</option>
+              ))}
+            </select>
           </div>
 
-          <div className="flex gap-3 mt-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Location *
+            </label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="City, State"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Image URL
+            </label>
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) => setImageUrl(e.target.value)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              placeholder="https://example.com/image.jpg"
+            />
+          </div>
+
+          <div className="flex gap-4 pt-4">
             <button
-              onClick={handleSubmit}
-              className="flex-1 bg-emerald-500 text-white px-4 py-2 rounded font-medium hover:bg-emerald-600 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              disabled={newItemImages.length === 0 || !newItem.name.trim()}
+              type="submit"
+              className="flex-1 bg-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-emerald-700 transition-colors"
             >
-              Create
+              Create Post
             </button>
             <button
-              onClick={handleClose}
-              className="flex-1 bg-gray-300 px-4 py-2 rounded font-medium hover:bg-gray-400"
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-gray-200 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
             >
               Cancel
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );

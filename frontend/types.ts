@@ -1,72 +1,55 @@
+// Type definitions for GoodFinds
+
 export interface Item {
-  id: number;
+  id: string;
   name: string;
   category: string;
-  price: number;
-  images: string[];
-  claimed?: boolean;
   description?: string;
+  images?: string[];
+  condition?: string;
+  location?: string;
+  claimed: boolean;
+  ownerId: string;
+  claimedBy?: string;
 }
 
 export interface Review {
-  id: number;
+  id: string;
   itemName: string;
   rating: number;
   comment: string;
   date: string;
 }
 
-export type Page = 'home' | 'catalog' | 'profile';
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+  reputation: number;
+  reviews: number;
+}
 
-export const items: Item[] = [
-  { 
-    id: 1, 
-    name: 'Wireless Headphones', 
-    category: 'Electronics', 
-    price: 79.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
-  { 
-    id: 2, 
-    name: 'Coffee Beans', 
-    category: 'Home', 
-    price: 24.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
-  { 
-    id: 3, 
-    name: 'Yoga Mat', 
-    category: 'Sports', 
-    price: 34.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
-  { 
-    id: 4, 
-    name: 'Knife Set', 
-    category: 'Home', 
-    price: 89.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
-  { 
-    id: 5, 
-    name: 'Running Shoes', 
-    category: 'Sports', 
-    price: 119.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
-  { 
-    id: 6, 
-    name: 'Smart Watch', 
-    category: 'Electronics', 
-    price: 199.99, 
-    images: ['/default_img.png'],
-    claimed: false
-  },
+export interface Post {
+  id: string;
+  item_title: string;
+  description?: string;
+  owner_id: string;
+  created_at: string;
+  images: string[];
+  category?: string;
+  condition: string;
+  location: string;
+  claimed_by?: string;
+  status: string;
+}
+
+export const categories = [
+  'All',
+  'Electronics',
+  'Furniture',
+  'Clothing',
+  'Books',
+  'Toys',
+  'Sports',
+  'Other'
 ];
-
-export const categories = ['All', 'Electronics', 'Sports', 'Home'];

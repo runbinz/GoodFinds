@@ -12,6 +12,9 @@ export default function Card({ item, onClick }: CardProps) {
     ? item.images[0] 
     : DEFAULT_IMAGE;
 
+  // Debug logging
+  console.log('Card item:', item);
+
   return (
     <div 
       className="bg-white rounded-lg shadow overflow-hidden cursor-pointer hover:shadow-lg transition"
@@ -20,13 +23,20 @@ export default function Card({ item, onClick }: CardProps) {
       <div className="h-48 w-full bg-gray-200">
         <img 
           src={displayImage} 
-          alt={item.name}
+          alt={item.item_title || 'Item'}
           className="w-full h-full object-cover"
         />
       </div>
       <div className="p-6">
-        <h3 className="font-semibold text-lg mb-2">{item.name}</h3>
-        <div className="text-sm text-gray-600 mb-2">{item.category}</div>
+        <h3 className="font-semibold text-lg mb-2">
+          {item.item_title || 'Untitled Item'}
+        </h3>
+        <div className="text-sm text-gray-600 mb-2">{item.category || 'Other'}</div>
+        {item.status === 'claimed' && (
+          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block mt-2">
+            Claimed
+          </div>
+        )}
       </div>
     </div>
   );
