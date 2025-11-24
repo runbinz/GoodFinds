@@ -1,104 +1,142 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
+from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-import db
-from models import Post, CreatePostRequest, ClaimPostRequest
-from utils import post_doc_to_model
-from auth import get_current_user
+from db import get_posts_collection, get_users_collection
+from models import Post
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
+class CreatePostRequest(BaseModel):
+    user_id: str
+    item_title: str 
+    description: Optional[str] = ""
+    images: List[str] = []
+    category: Optional[str] = "Other"
+    condition: str = "Used"
+    location: str
+
+class ClaimPostRequest(BaseModel):
+    user_id: str
+
+def post_to_response(post_doc) -> Post:
+    return Post(
+        id=str(post_doc["_id"]),
+        item_title=post_doc["item_title"],
+        description=post_doc.get("description"),
+        owner_id=post_doc["owner_id"],
+        created_at=post_doc["created_at"],
+        images=post_doc.get("images", []),
+        category=post_doc.get("category"),
+        condition=post_doc["condition"],
+        location=post_doc["location"],
+        claimed_by=post_doc.get("claimed_by"),
+        status=post_doc["status"]
+    )
+
+@router.get("", response_model=List[Post])
+async def get_all_posts(
+    category: Optional[str] = Query(None),
+    status: Optional[str] = Query(None)
+):
+    """Get all posts with optional filters"""
+    posts = get_posts_collection()
+    
+    query = {}
+    if category and category != "All":
+        query["category"] = category
+    if status:
+        query["status"] = status
+    
+    cursor = posts.find(query).sort("created_at", -1)
+    posts_list = await cursor.to_list(length=None)
+    
+    return [post_to_response(post) for post in posts_list]
 
 @router.post("", response_model=Post, status_code=201)
-async def create_post(
-    post: CreatePostRequest,
-    current_user: dict = Depends(get_current_user)
-):
+async def create_post(post: CreatePostRequest):
+    """Create a new post"""
+    posts = get_posts_collection()
+    
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
         "owner_id": current_user["id"],
         "created_at": datetime.utcnow(),
-        "images": post.images,
+        "images": post.images if post.images else [],
         "category": post.category,
         "condition": post.condition,
         "location": post.location,
         "claimed_by": None,
         "status": "available"
     }
-
-    result = await db.database.posts.insert_one(post_doc)
+    
+    result = await posts.insert_one(post_doc)
     post_doc["_id"] = result.inserted_id
-
-    return post_doc_to_model(post_doc)
-
-
-@router.get("", response_model=List[Post])
-async def search_posts(
-    category: Optional[str] = Query(None),
-    location: Optional[str] = Query(None),
-    condition: Optional[str] = Query(None),
-    status: Optional[str] = Query("available"),
-    limit: int = Query(50, le=100)
-):
-    query = {}
     
-    if category:
-        query["category"] = category
-    if location:
-        query["location"] = {"$regex": location, "$options": "i"}
-    if condition:
-        query["condition"] = condition
-    if status:
-        query["status"] = status
-    
-    cursor = db.database.posts.find(query).limit(limit).sort("created_at", -1)
-    posts = await cursor.to_list(length=limit)
-    
-    return [post_doc_to_model(post) for post in posts]
-
+    return post_to_response(post_doc)
 
 @router.get("/{post_id}", response_model=Post)
 async def get_post(post_id: str):
-    if not ObjectId.is_valid(post_id):
-        raise HTTPException(status_code=400, detail="Invalid post ID")
+    """Get a single post by ID"""
+    posts = get_posts_collection()
     
-    post = await db.database.posts.find_one({"_id": ObjectId(post_id)})
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
     
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    return post_doc_to_model(post)
+    return post_to_response(post)
 
-
-@router.patch("/{post_id}/claim", response_model=Post)
-async def claim_post(
-    post_id: str,
-    claim_request: ClaimPostRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    if not ObjectId.is_valid(post_id):
-        raise HTTPException(status_code=400, detail="Invalid post ID")
+@router.post("/{post_id}/claim", response_model=Post)
+async def claim_post(post_id: str, claim: ClaimPostRequest):
+    """Claim a post"""
+    posts = get_posts_collection()
     
-    post = await db.database.posts.find_one({"_id": ObjectId(post_id)})
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
     
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
-    if post["status"] != "available":
-        raise HTTPException(status_code=400, detail="Post is not available")
+    if post["status"] == "claimed":
+        raise HTTPException(status_code=400, detail="Post already claimed")
     
-    if post["owner_id"] == current_user["id"]:
-        raise HTTPException(status_code=400, detail="Cannot claim your own post")
-    
-    result = await db.database.posts.find_one_and_update(
+    # Update post
+    result = await posts.update_one(
         {"_id": ObjectId(post_id)},
-        {"$set": {
-            "claimed_by": current_user["id"],
-            "status": "claimed"
-        }},
-        return_document=True
+        {
+            "$set": {
+                "claimed_by": claim.user_id,
+                "status": "claimed"
+            }
+        }
     )
     
-    return post_doc_to_model(result)
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to claim post")
+    
+    # Get updated post
+    updated_post = await posts.find_one({"_id": ObjectId(post_id)})
+    return post_to_response(updated_post)
+
+@router.delete("/{post_id}", status_code=204)
+async def delete_post(post_id: str):
+    """Delete a post"""
+    posts = get_posts_collection()
+    
+    try:
+        result = await posts.delete_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    return None

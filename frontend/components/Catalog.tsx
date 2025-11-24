@@ -1,32 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
-import { Item, categories } from '../types';
 import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
+import { Item } from '@/types';
+import { postsAPI } from './api';
 
-interface CatalogProps {
-  items: Item[];
-}
+const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
 
 const DEFAULT_IMAGE = '/default_img.png';
 
-export default function Catalog({ items }: CatalogProps) {
-  const { isSignedIn } = useUser();
-  const [itemsState, setItemsState] = useState<Item[]>(items);
+export default function Catalog() {
+  const { isSignedIn, user } = useUser();
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const filtered = itemsState.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) &&
+  // Fetch posts from backend
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching posts from API...');
+      const posts = await postsAPI.getAll();
+      console.log('Posts fetched:', posts);
+      setItems(posts);
+      setError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch posts';
+      console.error('Error fetching posts:', err);
+      console.error('API URL:', process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+      setError(`${errorMessage}. Check console for details.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Client-side filtering
+  const filtered = items.filter(p => 
+    p.item_title.toLowerCase().includes(search.toLowerCase()) &&
     (category === 'All' || p.category === category)
   );
 
-  const handleClaim = () => {
-    if (!isSignedIn) {
+  const handleClaim = async () => {
+    if (!isSignedIn || !user) {
       alert('Please sign in to claim items');
       return;
     }
@@ -34,37 +59,87 @@ export default function Catalog({ items }: CatalogProps) {
     if (!selectedItem) return;
 
     // Check if already claimed
-    if (selectedItem.claimed) {
+    if (selectedItem.status === 'claimed') {
       alert('This item has already been claimed');
       return;
     }
 
-    // Update the item to claimed
-    const updatedItems = itemsState.map(item => 
-      item.id === selectedItem.id 
-        ? { ...item, claimed: true }
-        : item
-    );
-
-    setItemsState(updatedItems);
-    
-    // Update selectedItem to reflect the claim
-    setSelectedItem({
-      ...selectedItem,
-      claimed: true
-    });
-
-    alert(`Successfully claimed: ${selectedItem.name}!`);
+    try {
+      // Call backend API to claim the post
+      const updatedPost = await postsAPI.claim(selectedItem.id, user.id);
+      
+      // Update local state
+      setItems(items.map(item => 
+        item.id === updatedPost.id ? updatedPost : item
+      ));
+      
+      setSelectedItem(updatedPost);
+      alert(`Successfully claimed: ${updatedPost.item_title}!`);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to claim item');
+      console.error('Error claiming post:', err);
+    }
   };
 
-  const handleCreatePost = (newItem: Item) => {
-    setItemsState([newItem, ...itemsState]);
-    setShowCreatePost(false);
+  const handleCreatePost = async (newItem: {
+    item_title: string;
+    description?: string;
+    images: string[];
+    category?: string;
+    condition: string;
+    location: string;
+  }) => {
+    if (!isSignedIn || !user) {
+      alert('Please sign in to create posts');
+      return;
+    }
+
+    const postData = {
+      user_id: user.id,
+      item_title: newItem.item_title,
+      description: newItem.description || '',
+      images: newItem.images || [],
+      category: newItem.category || 'Other',
+      condition: newItem.condition,
+      location: newItem.location,
+    };
+
+    console.log('Creating post with data:', postData);
+
+    try {
+      const createdPost = await postsAPI.create(postData);
+
+      console.log('Post created successfully:', createdPost);
+      setItems([createdPost, ...items]);
+      setShowCreatePost(false);
+      alert('Post created successfully!');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create post';
+      console.error('Error creating post:', err);
+      console.error('Error details:', errorMessage);
+      alert(`Failed to create post: ${errorMessage}`);
+    }
   };
 
   const displayImages = selectedItem?.images && selectedItem.images.length > 0 
     ? selectedItem.images 
     : [DEFAULT_IMAGE];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-gray-600">Loading posts...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-red-600">Error: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -82,7 +157,7 @@ export default function Catalog({ items }: CatalogProps) {
         {filtered.map(item => (
           <Card 
             key={item.id} 
-            item={item} 
+            item={item}
             onClick={() => {
               setSelectedItem(item);
               setCurrentImageIndex(0);
@@ -91,13 +166,19 @@ export default function Catalog({ items }: CatalogProps) {
         ))}
       </div>
 
+      {filtered.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          No items found. {isSignedIn && 'Create the first post!'}
+        </div>
+      )}
+
       {selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedItem(null)}>
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4">
               <img 
                 src={displayImages[currentImageIndex]} 
-                alt={selectedItem.name}
+                alt={selectedItem.item_title}
                 className="w-full h-64 object-cover rounded-lg"
               />
               {displayImages.length > 1 && (
@@ -113,25 +194,26 @@ export default function Catalog({ items }: CatalogProps) {
               )}
             </div>
             
-            <h2 className="text-2xl font-bold mb-4">{selectedItem.name}</h2>
+            <h2 className="text-2xl font-bold mb-4">{selectedItem.item_title}</h2>
             <p className="text-gray-600 mb-2">Category: {selectedItem.category}</p>
+            <p className="text-gray-600 mb-2">Condition: {selectedItem.condition}</p>
+            <p className="text-gray-600 mb-2">Location: {selectedItem.location}</p>
             <p className="text-gray-700 mb-4">{selectedItem.description}</p>
             
-            {/* Claim Status Display */}
-            {selectedItem.claimed && (
+            {selectedItem.status === 'claimed' && (
               <div className="mb-4 p-3 rounded-lg bg-gray-100 text-gray-700">
                 <p className="font-semibold">This item has been claimed</p>
               </div>
             )}
 
-            {!isSignedIn && !selectedItem.claimed && (
+            {!isSignedIn && selectedItem.status !== 'claimed' && (
               <p className="text-sm text-gray-600 mb-4 p-3 bg-blue-50 rounded-lg">
                 Sign in to claim this item
               </p>
             )}
             
             <div className="flex gap-4">
-              {!selectedItem.claimed ? (
+              {selectedItem.status !== 'claimed' ? (
                 <button 
                   onClick={handleClaim} 
                   disabled={!isSignedIn}
