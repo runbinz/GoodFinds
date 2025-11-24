@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Optional
@@ -62,7 +62,7 @@ async def create_post(post: CreatePostRequest):
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
-        "owner_id": post.user_id,
+        "owner_id": current_user["id"],
         "created_at": datetime.utcnow(),
         "images": post.images if post.images else [],
         "category": post.category,

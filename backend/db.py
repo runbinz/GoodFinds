@@ -37,6 +37,9 @@ async def close_db():
         db_client.close()
         print("Disconnected from MongoDB")
 
+
+# Database collection getter methods
+
 def get_users_collection():
     if database is None:
         raise Exception("Database is not initialized.")
