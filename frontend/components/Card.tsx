@@ -1,7 +1,8 @@
-import { Item } from '../types';
+import Image from 'next/image';
+import { Post } from '../types';
 
 interface CardProps {
-  item: Item;
+  item: Post;
   onClick?: () => void;
 }
 
@@ -20,11 +21,13 @@ export default function Card({ item, onClick }: CardProps) {
       className="bg-white rounded-lg shadow overflow-hidden cursor-pointer hover:shadow-lg transition"
       onClick={onClick}
     >
-      <div className="h-48 w-full bg-gray-200">
-        <img 
+      <div className="h-48 w-full bg-gray-200 relative">
+        <Image 
           src={displayImage} 
           alt={item.item_title || 'Item'}
-          className="w-full h-full object-cover"
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          className="object-cover"
         />
       </div>
       <div className="p-6">
