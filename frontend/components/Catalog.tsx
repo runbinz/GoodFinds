@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import Image from 'next/image';
 import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
-import { Item } from '@/types';
-import { postsAPI } from './api';
+import { Post } from '@/types';
+import { publicPostsAPI, useAuthenticatedPosts } from './api';
 
 const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
 
@@ -12,12 +13,15 @@ const DEFAULT_IMAGE = '/default_img.png';
 
 export default function Catalog() {
   const { isSignedIn, user } = useUser();
-  const [items, setItems] = useState<Item[]>([]);
+  // Hook for authenticated operations
+  const authenticatedPosts = useAuthenticatedPosts();
+  
+  const [items, setItems] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -30,7 +34,8 @@ export default function Catalog() {
     try {
       setLoading(true);
       console.log('Fetching posts from API...');
-      const posts = await postsAPI.getAll();
+      // Use public API for viewing
+      const posts = await publicPostsAPI.getAll();
       console.log('Posts fetched:', posts);
       setItems(posts);
       setError(null);
@@ -65,8 +70,8 @@ export default function Catalog() {
     }
 
     try {
-      // Call backend API to claim the post
-      const updatedPost = await postsAPI.claim(selectedItem.id, user.id);
+      // Use authenticated API for claiming
+      const updatedPost = await authenticatedPosts.claim(selectedItem.id);
       
       // Update local state
       setItems(items.map(item => 
@@ -94,20 +99,11 @@ export default function Catalog() {
       return;
     }
 
-    const postData = {
-      user_id: user.id,
-      item_title: newItem.item_title,
-      description: newItem.description || '',
-      images: newItem.images || [],
-      category: newItem.category || 'Other',
-      condition: newItem.condition,
-      location: newItem.location,
-    };
-
-    console.log('Creating post with data:', postData);
+    console.log('Creating post with data:', newItem);
 
     try {
-      const createdPost = await postsAPI.create(postData);
+      // Use authenticated API for creating
+      const createdPost = await authenticatedPosts.create(newItem);
 
       console.log('Post created successfully:', createdPost);
       setItems([createdPost, ...items]);
@@ -125,21 +121,21 @@ export default function Catalog() {
     ? selectedItem.images 
     : [DEFAULT_IMAGE];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-gray-600">Loading posts...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl text-red-600">Error: {error}</div>
-      </div>
-    );
-  }
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-xl text-gray-600">Loading posts...</div>
+        </div>
+      );
+    }
+  
+    if (error) {
+      return (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-xl text-red-600">Error: {error}</div>
+        </div>
+      );
+    }
 
   return (
     <div>
@@ -176,11 +172,16 @@ export default function Catalog() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedItem(null)}>
           <div className="bg-white rounded-lg p-8 max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4">
-              <img 
-                src={displayImages[currentImageIndex]} 
-                alt={selectedItem.item_title}
-                className="w-full h-64 object-cover rounded-lg"
-              />
+              <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gray-200">
+                <Image 
+                  src={displayImages[currentImageIndex]} 
+                  alt={selectedItem.item_title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 672px"
+                  className="object-cover"
+                  priority
+                />
+              </div>
               {displayImages.length > 1 && (
                 <div className="flex justify-center gap-2 mt-4">
                   {displayImages.map((_, idx) => (
