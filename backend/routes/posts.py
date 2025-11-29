@@ -1,13 +1,14 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query
 from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from db import get_posts_collection, get_users_collection
+from db import get_posts_collection
 from models import Post
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
+# Request models
 class CreatePostRequest(BaseModel):
     user_id: str
     item_title: str 
@@ -20,7 +21,9 @@ class CreatePostRequest(BaseModel):
 class ClaimPostRequest(BaseModel):
     user_id: str
 
+
 def post_to_response(post_doc) -> Post:
+    """Convert MongoDB post document into response model"""
     return Post(
         id=str(post_doc["_id"]),
         item_title=post_doc["item_title"],
@@ -34,6 +37,7 @@ def post_to_response(post_doc) -> Post:
         claimed_by=post_doc.get("claimed_by"),
         status=post_doc["status"]
     )
+
 
 @router.get("", response_model=List[Post])
 async def get_all_posts(
@@ -54,15 +58,19 @@ async def get_all_posts(
     
     return [post_to_response(post) for post in posts_list]
 
+
 @router.post("", response_model=Post, status_code=201)
 async def create_post(post: CreatePostRequest):
     """Create a new post"""
     posts = get_posts_collection()
-    
+
+    # Debug log to verify frontend request body
+    print("📩 Received create post request:", post.dict())
+
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
-        "owner_id": current_user["id"],
+        "owner_id": post.user_id,  #use user_id from frontend
         "created_at": datetime.utcnow(),
         "images": post.images if post.images else [],
         "category": post.category,
@@ -71,11 +79,12 @@ async def create_post(post: CreatePostRequest):
         "claimed_by": None,
         "status": "available"
     }
-    
+
     result = await posts.insert_one(post_doc)
     post_doc["_id"] = result.inserted_id
-    
+
     return post_to_response(post_doc)
+
 
 @router.get("/{post_id}", response_model=Post)
 async def get_post(post_id: str):
@@ -91,6 +100,7 @@ async def get_post(post_id: str):
         raise HTTPException(status_code=404, detail="Post not found")
     
     return post_to_response(post)
+
 
 @router.post("/{post_id}/claim", response_model=Post)
 async def claim_post(post_id: str, claim: ClaimPostRequest):
@@ -108,23 +118,17 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
     if post["status"] == "claimed":
         raise HTTPException(status_code=400, detail="Post already claimed")
     
-    # Update post
     result = await posts.update_one(
         {"_id": ObjectId(post_id)},
-        {
-            "$set": {
-                "claimed_by": claim.user_id,
-                "status": "claimed"
-            }
-        }
+        {"$set": {"claimed_by": claim.user_id, "status": "claimed"}}
     )
     
     if result.modified_count == 0:
         raise HTTPException(status_code=500, detail="Failed to claim post")
     
-    # Get updated post
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
     return post_to_response(updated_post)
+
 
 @router.delete("/{post_id}", status_code=204)
 async def delete_post(post_id: str):

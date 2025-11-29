@@ -64,23 +64,29 @@ export function useAuthenticatedPosts() {
 
   return {
     // Create post
-    create: async (data: CreatePostData): Promise<Post> => {
+    create: async (data: CreatePostData & { user_id: string }): Promise<Post> => {
+      // Send POST request to create a new post with the user_id included
       return authenticatedRequest<Post>('/posts', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
     },
 
     // Claim post
-    claim: async (postId: string): Promise<Post> => {
+    claim: async (postId: string, userId: string): Promise<Post> => {
+      // Send POST request to /posts/{post_id}/claim endpoint with user_id
+      // Must be POST since backend defines @router.post("/{post_id}/claim")
       return authenticatedRequest<Post>(`/posts/${postId}/claim`, {
-        method: 'PATCH',
-        body: JSON.stringify({}),
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
       });
     },
 
     // Delete post
     delete: async (postId: string): Promise<void> => {
+      // Send DELETE request to remove a specific post by ID
       return authenticatedRequest<void>(`/posts/${postId}`, {
         method: 'DELETE',
       });
@@ -94,14 +100,17 @@ export function useAuthenticatedReviews() {
   return {
     // Create review
     create: async (data: CreateReviewData): Promise<Review> => {
+      // Send POST request to create a new review for a claimed post
       return authenticatedRequest<Review>('/reviews', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
     },
 
     // Delete review
     delete: async (reviewId: string): Promise<void> => {
+      // Send DELETE request to remove a review by ID
       return authenticatedRequest<void>(`/reviews/${reviewId}`, {
         method: 'DELETE',
       });
