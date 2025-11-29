@@ -6,6 +6,7 @@ import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
 import { Post } from '@/types';
 import { publicPostsAPI, useAuthenticatedPosts } from './api';
+import { CreatePostData } from './api';
 
 const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
 
@@ -13,7 +14,6 @@ const DEFAULT_IMAGE = '/default_img.png';
 
 export default function Catalog() {
   const { isSignedIn, user } = useUser();
-  // Hook for authenticated operations
   const authenticatedPosts = useAuthenticatedPosts();
   
   const [items, setItems] = useState<Post[]>([]);
@@ -34,7 +34,6 @@ export default function Catalog() {
     try {
       setLoading(true);
       console.log('Fetching posts from API...');
-      // Use public API for viewing
       const posts = await publicPostsAPI.getAll();
       console.log('Posts fetched:', posts);
       setItems(posts);
@@ -55,6 +54,7 @@ export default function Catalog() {
     (category === 'All' || p.category === category)
   );
 
+  // Claim item handler
   const handleClaim = async () => {
     if (!isSignedIn || !user) {
       alert('Please sign in to claim items');
@@ -63,21 +63,14 @@ export default function Catalog() {
 
     if (!selectedItem) return;
 
-    // Check if already claimed
     if (selectedItem.status === 'claimed') {
       alert('This item has already been claimed');
       return;
     }
 
     try {
-      // Use authenticated API for claiming
-      const updatedPost = await authenticatedPosts.claim(selectedItem.id);
-      
-      // Update local state
-      setItems(items.map(item => 
-        item.id === updatedPost.id ? updatedPost : item
-      ));
-      
+      const updatedPost = await authenticatedPosts.claim(selectedItem.id, user.id);
+      setItems(items.map(item => item.id === updatedPost.id ? updatedPost : item));
       setSelectedItem(updatedPost);
       alert(`Successfully claimed: ${updatedPost.item_title}!`);
     } catch (err) {
@@ -86,14 +79,8 @@ export default function Catalog() {
     }
   };
 
-  const handleCreatePost = async (newItem: {
-    item_title: string;
-    description?: string;
-    images: string[];
-    category?: string;
-    condition: string;
-    location: string;
-  }) => {
+  // Create new post handler
+  const handleCreatePost = async (newItem: CreatePostData) => {
     if (!isSignedIn || !user) {
       alert('Please sign in to create posts');
       return;
@@ -102,8 +89,10 @@ export default function Catalog() {
     console.log('Creating post with data:', newItem);
 
     try {
-      // Use authenticated API for creating
-      const createdPost = await authenticatedPosts.create(newItem);
+      const createdPost = await authenticatedPosts.create({
+        ...newItem,
+        user_id: user.id,
+      });
 
       console.log('Post created successfully:', createdPost);
       setItems([createdPost, ...items]);
@@ -121,21 +110,21 @@ export default function Catalog() {
     ? selectedItem.images 
     : [DEFAULT_IMAGE];
 
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-xl text-gray-600">Loading posts...</div>
-        </div>
-      );
-    }
-  
-    if (error) {
-      return (
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-xl text-red-600">Error: {error}</div>
-        </div>
-      );
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-gray-600">Loading posts...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-red-600">Error: {error}</div>
+      </div>
+    );
+  }
 
   return (
     <div>
