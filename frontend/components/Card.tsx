@@ -1,20 +1,20 @@
 import Image from 'next/image';
+import { Star } from 'lucide-react';
 import { Post } from '../types';
 
 interface CardProps {
   item: Post;
+  posterReputation?: number;
+  posterReviewCount?: number;
   onClick?: () => void;
 }
 
 const DEFAULT_IMAGE = '/default_img.png';
 
-export default function Card({ item, onClick }: CardProps) {
+export default function Card({ item, posterReputation, posterReviewCount, onClick }: CardProps) {
   const displayImage = item.images && item.images.length > 0 
     ? item.images[0] 
     : DEFAULT_IMAGE;
-
-  // Debug logging
-  console.log('Card item:', item);
 
   return (
     <div 
@@ -35,6 +35,16 @@ export default function Card({ item, onClick }: CardProps) {
           {item.item_title || 'Untitled Item'}
         </h3>
         <div className="text-sm text-gray-600 mb-2">{item.category || 'Other'}</div>
+        
+        {/* Poster Reputation */}
+        {posterReputation !== undefined && posterReviewCount !== undefined && posterReviewCount > 0 && (
+          <div className="flex items-center gap-1 text-sm text-gray-700 mb-2">
+            <Star size={14} className="fill-yellow-400 text-yellow-400" />
+            <span className="font-semibold">{posterReputation.toFixed(1)}</span>
+            <span className="text-gray-500">({posterReviewCount} review{posterReviewCount !== 1 ? 's' : ''})</span>
+          </div>
+        )}
+
         {item.status === 'claimed' && (
           <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block mt-2">
             Claimed

@@ -15,10 +15,12 @@ export interface Item {
 
 export interface Review {
   id: string;
-  itemName: string;
+  reviewer_id: string;
+  poster_id: string;
+  post_id: string;
   rating: number;
-  comment: string;
-  date: string;
+  comment?: string;
+  created_at: string;
 }
 
 export interface User {
@@ -26,7 +28,7 @@ export interface User {
   username: string;
   email: string;
   reputation: number;
-  reviews: number;
+  review_count: number;
 }
 
 export interface Post {
