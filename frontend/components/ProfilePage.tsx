@@ -1,8 +1,60 @@
-import React from 'react';
+'use client';
+import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import { Star, Package, ShoppingBag } from 'lucide-react';
+import Image from 'next/image';
+import ReviewList from './ReviewList';
+import { Post, Review, User as UserType } from '@/types';
+import { publicPostsAPI, publicReviewsAPI, publicUsersAPI } from './api';
+
+const DEFAULT_IMAGE = '/default_img.png';
 
 export default function ProfilePage() {
   const { user, isSignedIn } = useUser();
+  const [userReputation, setUserReputation] = useState<UserType | null>(null);
+  const [postedItems, setPostedItems] = useState<Post[]>([]);
+  const [claimedItems, setClaimedItems] = useState<Post[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'posted' | 'claimed'>('posted');
+
+  useEffect(() => {
+    if (isSignedIn && user) {
+      loadUserData();
+    }
+  }, [isSignedIn, user]);
+
+  const loadUserData = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+
+      // Load user reputation
+      const reputationData = await publicUsersAPI.getReputation(user.id);
+      setUserReputation(reputationData);
+
+      // Load all posts to filter by user
+      const allPosts = await publicPostsAPI.getAll();
+      
+      // Filter posted items (owned by user)
+      const posted = allPosts.filter(post => post.owner_id === user.id);
+      setPostedItems(posted);
+
+      // Filter claimed items (claimed by user)
+      const claimed = allPosts.filter(post => post.claimed_by === user.id);
+      setClaimedItems(claimed);
+
+      // Load reviews
+      const userReviews = await publicReviewsAPI.getByPosterId(user.id);
+      setReviews(userReviews);
+
+    } catch (err) {
+      console.error('Error loading user data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isSignedIn) {
     return (
@@ -13,13 +65,142 @@ export default function ProfilePage() {
     );
   }
 
-  return (
-    <div>
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-2xl font-bold mb-4">Your Profile</h2>
-        <p className="text-gray-600 mb-2">Username: {user.username || user.firstName || 'User'}</p>
-        <p className="text-gray-600 mb-2">Email: {user.primaryEmailAddress?.emailAddress}</p>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-xl text-gray-600">Loading profile...</div>
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* User Info & Reputation Card */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-3xl font-bold mb-4">Your Profile</h2>
+        <div className="grid md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-gray-600 mb-2">
+              <span className="font-semibold">Username:</span> {user.username || user.firstName || 'User'}
+            </p>
+            <p className="text-gray-600 mb-2">
+              <span className="font-semibold">Email:</span> {user.primaryEmailAddress?.emailAddress}
+            </p>
+          </div>
+          <div className="bg-emerald-50 rounded-lg p-4">
+            <h3 className="text-lg font-semibold mb-2 text-emerald-800">Reputation</h3>
+            <div className="flex items-center gap-2 mb-2">
+              <Star className="fill-yellow-400 text-yellow-400" size={24} />
+              <span className="text-2xl font-bold text-emerald-700">
+                {userReputation?.reputation.toFixed(1) || '0.0'}
+              </span>
+              <span className="text-gray-600">/ 5.0</span>
+            </div>
+            <p className="text-sm text-gray-600">
+              Based on {userReputation?.review_count || 0} review{userReputation?.review_count !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Items Tabs */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="border-b border-gray-200">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('posted')}
+              className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-semibold transition-colors ${
+                activeTab === 'posted'
+                  ? 'border-b-2 border-emerald-600 text-emerald-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <Package size={20} />
+              Posted Items ({postedItems.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('claimed')}
+              className={`flex-1 flex items-center justify-center gap-2 px-6 py-4 font-semibold transition-colors ${
+                activeTab === 'claimed'
+                  ? 'border-b-2 border-emerald-600 text-emerald-600'
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              <ShoppingBag size={20} />
+              Claimed Items ({claimedItems.length})
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6">
+          {activeTab === 'posted' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {postedItems.length > 0 ? (
+                postedItems.map(item => (
+                  <div key={item.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                    <div className="relative h-40 bg-gray-200">
+                      <Image
+                        src={item.images && item.images.length > 0 ? item.images[0] : DEFAULT_IMAGE}
+                        alt={item.item_title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold mb-1">{item.item_title}</h3>
+                      <p className="text-sm text-gray-600 mb-2">{item.category}</p>
+                      <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                        item.status === 'claimed' 
+                          ? 'bg-gray-200 text-gray-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {item.status === 'claimed' ? 'Claimed' : 'Available'}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 col-span-full text-center py-8">
+                  You haven&apos;t posted any items yet.
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'claimed' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {claimedItems.length > 0 ? (
+                claimedItems.map(item => (
+                  <div key={item.id} className="border rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+                    <div className="relative h-40 bg-gray-200">
+                      <Image
+                        src={item.images && item.images.length > 0 ? item.images[0] : DEFAULT_IMAGE}
+                        alt={item.item_title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold mb-1">{item.item_title}</h3>
+                      <p className="text-sm text-gray-600 mb-2">{item.category}</p>
+                      <span className="inline-block px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-700">
+                        Claimed by you
+                      </span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 col-span-full text-center py-8">
+                  You haven&apos;t claimed any items yet.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Reviews Section */}
+      <ReviewList reviews={reviews} title="Reviews Received" />
     </div>
   );
 }

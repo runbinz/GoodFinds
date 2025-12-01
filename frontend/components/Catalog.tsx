@@ -4,8 +4,9 @@ import Image from 'next/image';
 import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
-import { Post } from '@/types';
-import { publicPostsAPI, useAuthenticatedPosts } from './api';
+import ReviewForm from './ReviewForm';
+import { Post, User } from '@/types';
+import { publicPostsAPI, publicUsersAPI, useAuthenticatedPosts, useAuthenticatedReviews } from './api';
 import { CreatePostData } from './api';
 
 const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
@@ -15,6 +16,7 @@ const DEFAULT_IMAGE = '/default_img.png';
 export default function Catalog() {
   const { isSignedIn, user } = useUser();
   const authenticatedPosts = useAuthenticatedPosts();
+  const authenticatedReviews = useAuthenticatedReviews();
   
   const [items, setItems] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,9 @@ export default function Catalog() {
   const [selectedItem, setSelectedItem] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [itemToReview, setItemToReview] = useState<Post | null>(null);
+  const [posterReputations, setPosterReputations] = useState<Map<string, User>>(new Map());
 
   // Fetch posts from backend
   useEffect(() => {
@@ -37,6 +42,23 @@ export default function Catalog() {
       const posts = await publicPostsAPI.getAll();
       console.log('Posts fetched:', posts);
       setItems(posts);
+      
+      // Fetch reputation data for all unique posters
+      const uniqueOwnerIds = [...new Set(posts.map(post => post.owner_id))];
+      const reputationMap = new Map<string, User>();
+      
+      await Promise.all(
+        uniqueOwnerIds.map(async (ownerId) => {
+          try {
+            const userData = await publicUsersAPI.getReputation(ownerId);
+            reputationMap.set(ownerId, userData);
+          } catch (err) {
+            console.error(`Failed to fetch reputation for user ${ownerId}:`, err);
+          }
+        })
+      );
+      
+      setPosterReputations(reputationMap);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch posts';
@@ -71,11 +93,38 @@ export default function Catalog() {
     try {
       const updatedPost = await authenticatedPosts.claim(selectedItem.id, user.id);
       setItems(items.map(item => item.id === updatedPost.id ? updatedPost : item));
-      setSelectedItem(updatedPost);
-      alert(`Successfully claimed: ${updatedPost.item_title}!`);
+      setSelectedItem(null);
+      
+      // Prompt user to leave a review
+      setItemToReview(updatedPost);
+      setShowReviewForm(true);
+      
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to claim item');
       console.error('Error claiming post:', err);
+    }
+  };
+
+  // Submit review handler
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    if (!user || !itemToReview) return;
+
+    try {
+      await authenticatedReviews.create({
+        poster_id: itemToReview.owner_id,
+        post_id: itemToReview.id,
+        rating,
+        comment,
+      });
+      
+      alert('Review submitted successfully!');
+      setShowReviewForm(false);
+      setItemToReview(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit review';
+      alert(`Failed to submit review: ${errorMessage}`);
+      console.error('Error submitting review:', err);
+      throw err;
     }
   };
 
@@ -139,16 +188,21 @@ export default function Catalog() {
       />
 
       <div className="grid grid-cols-3 gap-6">
-        {filtered.map(item => (
-          <Card 
-            key={item.id} 
-            item={item}
-            onClick={() => {
-              setSelectedItem(item);
-              setCurrentImageIndex(0);
-            }} 
-          />
-        ))}
+        {filtered.map(item => {
+          const posterData = posterReputations.get(item.owner_id);
+          return (
+            <Card 
+              key={item.id} 
+              item={item}
+              posterReputation={posterData?.reputation}
+              posterReviewCount={posterData?.review_count}
+              onClick={() => {
+                setSelectedItem(item);
+                setCurrentImageIndex(0);
+              }} 
+            />
+          );
+        })}
       </div>
 
       {filtered.length === 0 && (
@@ -240,6 +294,21 @@ export default function Catalog() {
         onClose={() => setShowCreatePost(false)}
         onCreatePost={handleCreatePost}
       />
+
+      {showReviewForm && itemToReview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="max-w-xl w-full">
+            <ReviewForm
+              post={itemToReview}
+              onSubmit={handleSubmitReview}
+              onCancel={() => {
+                setShowReviewForm(false);
+                setItemToReview(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

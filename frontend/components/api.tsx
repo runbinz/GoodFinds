@@ -107,13 +107,5 @@ export function useAuthenticatedReviews() {
         body: JSON.stringify(data),
       });
     },
-
-    // Delete review
-    delete: async (reviewId: string): Promise<void> => {
-      // Send DELETE request to remove a review by ID
-      return authenticatedRequest<void>(`/reviews/${reviewId}`, {
-        method: 'DELETE',
-      });
-    },
   };
 }
