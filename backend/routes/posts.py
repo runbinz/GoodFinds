@@ -21,6 +21,17 @@ class CreatePostRequest(BaseModel):
 class ClaimPostRequest(BaseModel):
     user_id: str
 
+class PickupConfirmRequest(BaseModel):
+    user_id: str
+
+class UpdatePostRequest(BaseModel):
+    item_title: Optional[str] = None
+    description: Optional[str] = None
+    images: Optional[List[str]] = None
+    category: Optional[str] = None
+    condition: Optional[str] = None
+    location: Optional[str] = None
+
 
 def post_to_response(post_doc) -> Post:
     """Convert MongoDB post document into response model"""
@@ -115,6 +126,10 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     
+    # Prevent users from claiming their own posts
+    if post["owner_id"] == claim.user_id:
+        raise HTTPException(status_code=400, detail="You cannot claim your own post")
+    
     if post["status"] == "claimed":
         raise HTTPException(status_code=400, detail="Post already claimed")
     
@@ -128,6 +143,83 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
     
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
     return post_to_response(updated_post)
+
+
+@router.put("/{post_id}", response_model=Post)
+async def update_post(post_id: str, update_data: UpdatePostRequest):
+    """Update a post (only available posts can be edited)"""
+    posts = get_posts_collection()
+    
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Cannot edit claimed posts
+    if post["status"] == "claimed":
+        raise HTTPException(status_code=400, detail="Cannot edit a claimed post")
+    
+    # Build update dictionary with only provided fields
+    update_fields = {}
+    if update_data.item_title is not None:
+        update_fields["item_title"] = update_data.item_title
+    if update_data.description is not None:
+        update_fields["description"] = update_data.description
+    if update_data.images is not None:
+        update_fields["images"] = update_data.images
+    if update_data.category is not None:
+        update_fields["category"] = update_data.category
+    if update_data.condition is not None:
+        update_fields["condition"] = update_data.condition
+    if update_data.location is not None:
+        update_fields["location"] = update_data.location
+    
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    result = await posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": update_fields}
+    )
+    
+    updated_post = await posts.find_one({"_id": ObjectId(post_id)})
+    return post_to_response(updated_post)
+
+
+@router.post("/{post_id}/pickup", status_code=200)
+async def confirm_pickup(post_id: str, pickup: PickupConfirmRequest):
+    """
+    Confirm item pickup and delete the post.
+    Can be confirmed by either the poster (owner) or the claimer.
+    """
+    posts = get_posts_collection()
+    
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Only claimed posts can be marked as picked up
+    if post["status"] != "claimed":
+        raise HTTPException(status_code=400, detail="Only claimed items can be marked as picked up")
+    
+    # Only the poster or claimer can confirm pickup
+    if pickup.user_id != post["owner_id"] and pickup.user_id != post.get("claimed_by"):
+        raise HTTPException(status_code=403, detail="Only the poster or claimer can confirm pickup")
+    
+    # Delete the post
+    result = await posts.delete_one({"_id": ObjectId(post_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete post")
+    
+    return {"message": "Item picked up successfully", "post_id": post_id}
 
 
 @router.delete("/{post_id}", status_code=204)

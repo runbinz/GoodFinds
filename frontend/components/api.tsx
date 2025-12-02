@@ -11,6 +11,15 @@ export interface CreatePostData {
   location: string;
 }
 
+export interface UpdatePostData {
+  item_title?: string;
+  description?: string;
+  images?: string[];
+  category?: string;
+  condition?: string;
+  location?: string;
+}
+
 export interface CreateReviewData {
   poster_id: string;
   post_id: string;
@@ -89,6 +98,26 @@ export function useAuthenticatedPosts() {
       // Send DELETE request to remove a specific post by ID
       return authenticatedRequest<void>(`/posts/${postId}`, {
         method: 'DELETE',
+      });
+    },
+
+    // Update post
+    update: async (postId: string, data: UpdatePostData): Promise<Post> => {
+      // Send PUT request to update a post
+      return authenticatedRequest<Post>(`/posts/${postId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+    },
+
+    // Confirm pickup (deletes the post)
+    confirmPickup: async (postId: string, userId: string): Promise<{ message: string; post_id: string }> => {
+      // Send POST request to confirm pickup and delete the item
+      return authenticatedRequest<{ message: string; post_id: string }>(`/posts/${postId}/pickup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
       });
     },
   };

@@ -46,8 +46,8 @@ export default function Card({ item, posterReputation, posterReviewCount, onClic
         )}
 
         {item.status === 'claimed' && (
-          <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded inline-block mt-2">
-            Claimed
+          <div className="text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded inline-block mt-2">
+            Awaiting Pickup
           </div>
         )}
       </div>
