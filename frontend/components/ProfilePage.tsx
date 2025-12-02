@@ -92,7 +92,7 @@ export default function ProfilePage() {
     if (!user) return;
     
     try {
-      await authenticatedPosts.confirmPickup(postId, user.id);
+      await authenticatedPosts.confirmPickup(postId);
       // Remove from both lists since item is now deleted
       setPostedItems(postedItems.filter(item => item.id !== postId));
       setClaimedItems(claimedItems.filter(item => item.id !== postId));

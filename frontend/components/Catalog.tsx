@@ -105,7 +105,7 @@ export default function Catalog() {
     }
 
     try {
-      const updatedPost = await authenticatedPosts.claim(selectedItem.id, user.id);
+      const updatedPost = await authenticatedPosts.claim(selectedItem.id);
       setItems(items.map(item => item.id === updatedPost.id ? updatedPost : item));
       setSelectedItem(null);
       
@@ -152,10 +152,7 @@ export default function Catalog() {
     console.log('Creating post with data:', newItem);
 
     try {
-      const createdPost = await authenticatedPosts.create({
-        ...newItem,
-        user_id: user.id,
-      });
+      const createdPost = await authenticatedPosts.create(newItem);
 
       console.log('Post created successfully:', createdPost);
       setItems([createdPost, ...items]);

@@ -1,28 +1,22 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from db import get_posts_collection
 from models import Post
+from auth import get_current_user
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
 # Request models
 class CreatePostRequest(BaseModel):
-    user_id: str
     item_title: str 
     description: Optional[str] = ""
     images: List[str] = []
     category: Optional[str] = "Other"
     condition: str = "Used"
     location: str
-
-class ClaimPostRequest(BaseModel):
-    user_id: str
-
-class PickupConfirmRequest(BaseModel):
-    user_id: str
 
 class UpdatePostRequest(BaseModel):
     item_title: Optional[str] = None
@@ -71,17 +65,21 @@ async def get_all_posts(
 
 
 @router.post("", response_model=Post, status_code=201)
-async def create_post(post: CreatePostRequest):
-    """Create a new post"""
+async def create_post(
+    post: CreatePostRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new post (requires authentication)"""
     posts = get_posts_collection()
 
     # Debug log to verify frontend request body
     print("📩 Received create post request:", post.dict())
+    print("📩 Authenticated user:", current_user["id"])
 
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
-        "owner_id": post.user_id,  #use user_id from frontend
+        "owner_id": current_user["id"],  # Use authenticated user ID
         "created_at": datetime.utcnow(),
         "images": post.images if post.images else [],
         "category": post.category,
@@ -114,8 +112,11 @@ async def get_post(post_id: str):
 
 
 @router.post("/{post_id}/claim", response_model=Post)
-async def claim_post(post_id: str, claim: ClaimPostRequest):
-    """Claim a post"""
+async def claim_post(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Claim a post (requires authentication)"""
     posts = get_posts_collection()
     
     try:
@@ -127,7 +128,7 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
         raise HTTPException(status_code=404, detail="Post not found")
     
     # Prevent users from claiming their own posts
-    if post["owner_id"] == claim.user_id:
+    if post["owner_id"] == current_user["id"]:
         raise HTTPException(status_code=400, detail="You cannot claim your own post")
     
     if post["status"] == "claimed":
@@ -135,7 +136,7 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
     
     result = await posts.update_one(
         {"_id": ObjectId(post_id)},
-        {"$set": {"claimed_by": claim.user_id, "status": "claimed"}}
+        {"$set": {"claimed_by": current_user["id"], "status": "claimed"}}
     )
     
     if result.modified_count == 0:
@@ -146,8 +147,12 @@ async def claim_post(post_id: str, claim: ClaimPostRequest):
 
 
 @router.put("/{post_id}", response_model=Post)
-async def update_post(post_id: str, update_data: UpdatePostRequest):
-    """Update a post (only available posts can be edited)"""
+async def update_post(
+    post_id: str,
+    update_data: UpdatePostRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a post (requires authentication, only owner can edit)"""
     posts = get_posts_collection()
     
     try:
@@ -157,6 +162,10 @@ async def update_post(post_id: str, update_data: UpdatePostRequest):
     
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Only the owner can edit their post
+    if post["owner_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="You can only edit your own posts")
     
     # Cannot edit claimed posts
     if post["status"] == "claimed":
@@ -190,9 +199,12 @@ async def update_post(post_id: str, update_data: UpdatePostRequest):
 
 
 @router.post("/{post_id}/pickup", status_code=200)
-async def confirm_pickup(post_id: str, pickup: PickupConfirmRequest):
+async def confirm_pickup(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
     """
-    Confirm item pickup and delete the post.
+    Confirm item pickup and delete the post (requires authentication).
     Can be confirmed by either the poster (owner) or the claimer.
     """
     posts = get_posts_collection()
@@ -210,7 +222,7 @@ async def confirm_pickup(post_id: str, pickup: PickupConfirmRequest):
         raise HTTPException(status_code=400, detail="Only claimed items can be marked as picked up")
     
     # Only the poster or claimer can confirm pickup
-    if pickup.user_id != post["owner_id"] and pickup.user_id != post.get("claimed_by"):
+    if current_user["id"] != post["owner_id"] and current_user["id"] != post.get("claimed_by"):
         raise HTTPException(status_code=403, detail="Only the poster or claimer can confirm pickup")
     
     # Delete the post
@@ -223,16 +235,28 @@ async def confirm_pickup(post_id: str, pickup: PickupConfirmRequest):
 
 
 @router.delete("/{post_id}", status_code=204)
-async def delete_post(post_id: str):
-    """Delete a post"""
+async def delete_post(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a post (requires authentication, only owner can delete)"""
     posts = get_posts_collection()
     
     try:
-        result = await posts.delete_one({"_id": ObjectId(post_id)})
+        post = await posts.find_one({"_id": ObjectId(post_id)})
     except:
         raise HTTPException(status_code=400, detail="Invalid post ID")
     
-    if result.deleted_count == 0:
+    if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Only the owner can delete their post
+    if post["owner_id"] != current_user["id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own posts")
+    
+    result = await posts.delete_one({"_id": ObjectId(post_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete post")
     
     return None
