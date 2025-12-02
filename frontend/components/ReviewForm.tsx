@@ -96,7 +96,7 @@ export default function ReviewForm({ post, onSubmit, onCancel }: ReviewFormProps
             disabled={isSubmitting}
             className="flex-1 bg-gray-200 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:cursor-not-allowed"
           >
-            Cancel
+            Skip
           </button>
         </div>
       </form>
