@@ -72,9 +72,8 @@ export function useAuthenticatedPosts() {
   const { authenticatedRequest } = useAuthenticatedAPI();
 
   return {
-    // Create post
-    create: async (data: CreatePostData & { user_id: string }): Promise<Post> => {
-      // Send POST request to create a new post with the user_id included
+    // Create post (user ID comes from auth token)
+    create: async (data: CreatePostData): Promise<Post> => {
       return authenticatedRequest<Post>('/posts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,28 +81,24 @@ export function useAuthenticatedPosts() {
       });
     },
 
-    // Claim post
-    claim: async (postId: string, userId: string): Promise<Post> => {
-      // Send POST request to /posts/{post_id}/claim endpoint with user_id
-      // Must be POST since backend defines @router.post("/{post_id}/claim")
+    // Claim post (user ID comes from auth token)
+    claim: async (postId: string): Promise<Post> => {
       return authenticatedRequest<Post>(`/posts/${postId}/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({}),
       });
     },
 
-    // Delete post
+    // Delete post (user ID comes from auth token)
     delete: async (postId: string): Promise<void> => {
-      // Send DELETE request to remove a specific post by ID
       return authenticatedRequest<void>(`/posts/${postId}`, {
         method: 'DELETE',
       });
     },
 
-    // Update post
+    // Update post (user ID comes from auth token)
     update: async (postId: string, data: UpdatePostData): Promise<Post> => {
-      // Send PUT request to update a post
       return authenticatedRequest<Post>(`/posts/${postId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -111,13 +106,12 @@ export function useAuthenticatedPosts() {
       });
     },
 
-    // Confirm pickup (deletes the post)
-    confirmPickup: async (postId: string, userId: string): Promise<{ message: string; post_id: string }> => {
-      // Send POST request to confirm pickup and delete the item
+    // Confirm pickup (user ID comes from auth token)
+    confirmPickup: async (postId: string): Promise<{ message: string; post_id: string }> => {
       return authenticatedRequest<{ message: string; post_id: string }>(`/posts/${postId}/pickup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({}),
       });
     },
   };

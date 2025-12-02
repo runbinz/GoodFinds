@@ -3,7 +3,9 @@ import os
 from dotenv import load_dotenv
 import certifi
 
-load_dotenv()
+# Load environment variables from the backend .env file
+ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path=ENV_PATH)
 
 db_client = None
 database = None
