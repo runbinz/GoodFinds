@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Upload } from 'lucide-react';
 
 const categories = ['Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
 const conditions = ['New', 'Like New', 'Used', 'For Parts'];
@@ -23,9 +23,38 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
   const [category, setCategory] = useState(categories[0]);
   const [condition, setCondition] = useState(conditions[0]);
   const [location, setLocation] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   if (!show) return null;
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+
+    setImageFile(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeImage = () => {
+    setImageFile(null);
+    setImagePreview('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,22 +67,22 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     const newItem = {
       item_title: title,
       description: description || undefined,
-      images: imageUrl ? [imageUrl] : [],
+      images: imagePreview ? [imagePreview] : [],
       category: category || undefined,
       condition: condition,
       location: location,
     };
 
-    console.log('Submitting new item:', newItem);
+    console.log('Submitting new item');
     onCreatePost(newItem);
 
-    // Reset form
     setTitle('');
     setDescription('');
     setCategory(categories[0]);
     setCondition(conditions[0]);
     setLocation('');
-    setImageUrl('');
+    setImageFile(null);
+    setImagePreview('');
   };
 
   return (
@@ -139,15 +168,37 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Image URL
+              Image
             </label>
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              placeholder="https://example.com/image.jpg"
-            />
+            
+            {!imagePreview ? (
+              <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                <Upload size={32} className="text-gray-400 mb-2" />
+                <span className="text-sm text-gray-500">Click to upload image</span>
+                <span className="text-xs text-gray-400 mt-1">Max size: 5MB</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+            ) : (
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-4 pt-4">
