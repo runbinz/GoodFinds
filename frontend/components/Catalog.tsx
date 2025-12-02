@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import Image from 'next/image';
+import { Star, User as UserIcon } from 'lucide-react';
 import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
 import ReviewForm from './ReviewForm';
+import UserProfileModal from './UserProfileModal';
 import { Post, User } from '@/types';
 import { publicPostsAPI, publicUsersAPI, useAuthenticatedPosts, useAuthenticatedReviews } from './api';
 import { CreatePostData } from './api';
@@ -23,12 +25,15 @@ export default function Catalog() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [status, setStatus] = useState('All');
+  const [condition, setCondition] = useState('All');
   const [selectedItem, setSelectedItem] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [itemToReview, setItemToReview] = useState<Post | null>(null);
   const [posterReputations, setPosterReputations] = useState<Map<string, User>>(new Map());
+  const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
 
   // Fetch posts from backend
   useEffect(() => {
@@ -71,10 +76,19 @@ export default function Catalog() {
   };
 
   // Client-side filtering
-  const filtered = items.filter(p => 
-    p.item_title.toLowerCase().includes(search.toLowerCase()) &&
-    (category === 'All' || p.category === category)
-  );
+  const filtered = items.filter(p => {
+    const matchesSearch = p.item_title.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = category === 'All' || p.category === category;
+    const matchesStatus = status === 'All' || 
+      (status === 'Available' && p.status === 'available') ||
+      (status === 'Claimed' && p.status === 'claimed');
+    const matchesCondition = condition === 'All' || p.condition === condition;
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition;
+  });
+
+  // Check if user is the owner of the selected item
+  const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
 
   // Claim item handler
   const handleClaim = async () => {
@@ -183,6 +197,10 @@ export default function Catalog() {
         category={category}
         onCategoryChange={setCategory}
         categories={categories}
+        status={status}
+        onStatusChange={setStatus}
+        condition={condition}
+        onConditionChange={setCondition}
         isSignedIn={isSignedIn}
         onCreatePost={() => setShowCreatePost(true)}
       />
@@ -213,7 +231,7 @@ export default function Catalog() {
 
       {selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" onClick={() => setSelectedItem(null)}>
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4">
               <div className="relative w-full h-64 rounded-lg overflow-hidden bg-gray-200">
                 <Image 
@@ -239,14 +257,53 @@ export default function Catalog() {
             </div>
             
             <h2 className="text-2xl font-bold mb-4">{selectedItem.item_title}</h2>
+            
+            {/* Poster Info - Clickable to view profile */}
+            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+              <button
+                onClick={() => {
+                  setSelectedItem(null);
+                  setViewingProfileUserId(selectedItem.owner_id);
+                }}
+                className="flex items-center gap-3 w-full text-left hover:bg-gray-100 rounded-lg p-2 -m-2 transition-colors"
+              >
+                <div className="w-10 h-10 bg-emerald-200 rounded-full flex items-center justify-center">
+                  <UserIcon size={20} className="text-emerald-700" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium text-gray-800">
+                    {posterReputations.get(selectedItem.owner_id)?.username || 'View Poster'}
+                  </p>
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <Star size={14} className="fill-yellow-400 text-yellow-400" />
+                    <span>
+                      {posterReputations.get(selectedItem.owner_id)?.reputation?.toFixed(1) || '0.0'}
+                    </span>
+                    <span className="text-gray-400">
+                      ({posterReputations.get(selectedItem.owner_id)?.review_count || 0} reviews)
+                    </span>
+                  </div>
+                </div>
+                <span className="text-emerald-600 text-sm font-medium">View Profile →</span>
+              </button>
+            </div>
+
             <p className="text-gray-600 mb-2">Category: {selectedItem.category}</p>
             <p className="text-gray-600 mb-2">Condition: {selectedItem.condition}</p>
             <p className="text-gray-600 mb-2">Location: {selectedItem.location}</p>
             <p className="text-gray-700 mb-4">{selectedItem.description}</p>
             
             {selectedItem.status === 'claimed' && (
-              <div className="mb-4 p-3 rounded-lg bg-gray-100 text-gray-700">
+              <div className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
                 <p className="font-semibold">This item has been claimed</p>
+                <p className="text-sm mt-1">Awaiting pickup by the claimer</p>
+              </div>
+            )}
+
+            {isOwnPost && selectedItem.status !== 'claimed' && (
+              <div className="mb-4 p-3 rounded-lg bg-blue-50 text-blue-700">
+                <p className="font-semibold">This is your listing</p>
+                <p className="text-sm">You can manage it from your Profile page.</p>
               </div>
             )}
 
@@ -260,21 +317,21 @@ export default function Catalog() {
               {selectedItem.status !== 'claimed' ? (
                 <button 
                   onClick={handleClaim} 
-                  disabled={!isSignedIn}
+                  disabled={!isSignedIn || isOwnPost}
                   className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
-                    isSignedIn 
+                    isSignedIn && !isOwnPost
                       ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
                       : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   }`}
                 >
-                  {isSignedIn ? 'Claim Item' : 'Sign In to Claim'}
+                  {!isSignedIn ? 'Sign In to Claim' : isOwnPost ? 'Your Listing' : 'Claim Item'}
                 </button>
               ) : (
                 <button 
-                  className="flex-1 bg-gray-400 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed"
+                  className="flex-1 bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed"
                   disabled
                 >
-                  Already Claimed
+                  Awaiting Pickup
                 </button>
               )}
               
@@ -308,6 +365,14 @@ export default function Catalog() {
             />
           </div>
         </div>
+      )}
+
+      {/* User Profile Modal */}
+      {viewingProfileUserId && (
+        <UserProfileModal
+          userId={viewingProfileUserId}
+          onClose={() => setViewingProfileUserId(null)}
+        />
       )}
     </div>
   );
