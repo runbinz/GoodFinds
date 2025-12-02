@@ -4,15 +4,17 @@ import { useUser } from '@clerk/clerk-react';
 import { Star, Package, ShoppingBag, Edit, Trash2, CheckCircle } from 'lucide-react';
 import Image from 'next/image';
 import ReviewList from './ReviewList';
+import ReviewForm from './ReviewForm';
 import EditPostModal from './EditPostModal';
 import { Post, Review, User as UserType } from '@/types';
-import { publicPostsAPI, publicReviewsAPI, publicUsersAPI, useAuthenticatedPosts, UpdatePostData } from './api';
+import { publicPostsAPI, publicReviewsAPI, publicUsersAPI, useAuthenticatedPosts, useAuthenticatedReviews, UpdatePostData } from './api';
 
 const DEFAULT_IMAGE = '/default_img.png';
 
 export default function ProfilePage() {
   const { user, isSignedIn } = useUser();
   const authenticatedPosts = useAuthenticatedPosts();
+  const authenticatedReviews = useAuthenticatedReviews();
   const [userReputation, setUserReputation] = useState<UserType | null>(null);
   const [postedItems, setPostedItems] = useState<Post[]>([]);
   const [claimedItems, setClaimedItems] = useState<Post[]>([]);
@@ -22,6 +24,8 @@ export default function ProfilePage() {
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [pickupPostId, setPickupPostId] = useState<string | null>(null);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [itemToReview, setItemToReview] = useState<Post | null>(null);
 
   useEffect(() => {
     if (isSignedIn && user) {
@@ -91,17 +95,70 @@ export default function ProfilePage() {
   const handleConfirmPickup = async (postId: string) => {
     if (!user) return;
     
+    // Find the post to get owner info for review
+    const claimedItem = claimedItems.find(item => item.id === postId);
+    const postedItem = postedItems.find(item => item.id === postId);
+    const itemForReview = claimedItem || postedItem;
+    
+    // Close the pickup confirmation modal
+    setPickupPostId(null);
+    
+    // Only show review form if user is the claimer (not the poster)
+    if (claimedItem && itemForReview) {
+      // Show review form BEFORE deleting the post
+      setItemToReview(itemForReview);
+      setShowReviewForm(true);
+    } else {
+      // If poster is confirming, delete immediately (no review needed)
+      await deletePostAfterPickup(postId);
+    }
+  };
+
+  const deletePostAfterPickup = async (postId: string) => {
     try {
       await authenticatedPosts.confirmPickup(postId);
       // Remove from both lists since item is now deleted
       setPostedItems(postedItems.filter(item => item.id !== postId));
       setClaimedItems(claimedItems.filter(item => item.id !== postId));
-      setPickupPostId(null);
       alert('Item marked as picked up and removed from listings!');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to confirm pickup';
       alert(`Error: ${errorMessage}`);
     }
+  };
+
+  const handleSubmitReview = async (rating: number, comment: string) => {
+    if (!user || !itemToReview) return;
+
+    try {
+      // Submit review first while post still exists
+      await authenticatedReviews.create({
+        poster_id: itemToReview.owner_id,
+        post_id: itemToReview.id,
+        rating,
+        comment,
+      });
+      
+      // After review is submitted, delete the post
+      await deletePostAfterPickup(itemToReview.id);
+      
+      setShowReviewForm(false);
+      setItemToReview(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to submit review';
+      alert(`Failed to submit review: ${errorMessage}`);
+      console.error('Error submitting review:', err);
+      throw err;
+    }
+  };
+
+  const handleSkipReview = async () => {
+    if (!itemToReview) return;
+    
+    // User chose to skip review, just delete the post
+    await deletePostAfterPickup(itemToReview.id);
+    setShowReviewForm(false);
+    setItemToReview(null);
   };
 
   if (!isSignedIn) {
@@ -351,6 +408,19 @@ export default function ProfilePage() {
                 Cancel
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Form Modal */}
+      {showReviewForm && itemToReview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="max-w-xl w-full">
+            <ReviewForm
+              post={itemToReview}
+              onSubmit={handleSubmitReview}
+              onCancel={handleSkipReview}
+            />
           </div>
         </div>
       )}

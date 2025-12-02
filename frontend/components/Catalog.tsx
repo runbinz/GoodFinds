@@ -5,10 +5,9 @@ import { Star, User as UserIcon } from 'lucide-react';
 import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
-import ReviewForm from './ReviewForm';
 import UserProfileModal from './UserProfileModal';
 import { Post, User } from '@/types';
-import { publicPostsAPI, publicUsersAPI, useAuthenticatedPosts, useAuthenticatedReviews } from './api';
+import { publicPostsAPI, publicUsersAPI, useAuthenticatedPosts } from './api';
 import { CreatePostData } from './api';
 
 const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
@@ -18,20 +17,16 @@ const DEFAULT_IMAGE = '/default_img.png';
 export default function Catalog() {
   const { isSignedIn, user } = useUser();
   const authenticatedPosts = useAuthenticatedPosts();
-  const authenticatedReviews = useAuthenticatedReviews();
   
   const [items, setItems] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
-  const [status, setStatus] = useState('All');
   const [condition, setCondition] = useState('All');
   const [selectedItem, setSelectedItem] = useState<Post | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [showReviewForm, setShowReviewForm] = useState(false);
-  const [itemToReview, setItemToReview] = useState<Post | null>(null);
   const [posterReputations, setPosterReputations] = useState<Map<string, User>>(new Map());
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
 
@@ -75,16 +70,14 @@ export default function Catalog() {
     }
   };
 
-  // Client-side filtering
+  // Client-side filtering - only show available items in public catalog
   const filtered = items.filter(p => {
     const matchesSearch = p.item_title.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === 'All' || p.category === category;
-    const matchesStatus = status === 'All' || 
-      (status === 'Available' && p.status === 'available') ||
-      (status === 'Claimed' && p.status === 'claimed');
     const matchesCondition = condition === 'All' || p.condition === condition;
     
-    return matchesSearch && matchesCategory && matchesStatus && matchesCondition;
+    // Only show available items in public catalog
+    return matchesSearch && matchesCategory && matchesCondition && p.status === 'available';
   });
 
   // Check if user is the owner of the selected item
@@ -108,39 +101,13 @@ export default function Catalog() {
       const updatedPost = await authenticatedPosts.claim(selectedItem.id);
       setItems(items.map(item => item.id === updatedPost.id ? updatedPost : item));
       setSelectedItem(null);
-      
-      // Prompt user to leave a review
-      setItemToReview(updatedPost);
-      setShowReviewForm(true);
-      
+      alert('Item claimed successfully! You can confirm pickup from your Profile page.');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to claim item');
       console.error('Error claiming post:', err);
     }
   };
 
-  // Submit review handler
-  const handleSubmitReview = async (rating: number, comment: string) => {
-    if (!user || !itemToReview) return;
-
-    try {
-      await authenticatedReviews.create({
-        poster_id: itemToReview.owner_id,
-        post_id: itemToReview.id,
-        rating,
-        comment,
-      });
-      
-      alert('Review submitted successfully!');
-      setShowReviewForm(false);
-      setItemToReview(null);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to submit review';
-      alert(`Failed to submit review: ${errorMessage}`);
-      console.error('Error submitting review:', err);
-      throw err;
-    }
-  };
 
   // Create new post handler
   const handleCreatePost = async (newItem: CreatePostData) => {
@@ -194,8 +161,6 @@ export default function Catalog() {
         category={category}
         onCategoryChange={setCategory}
         categories={categories}
-        status={status}
-        onStatusChange={setStatus}
         condition={condition}
         onConditionChange={setCondition}
         isSignedIn={isSignedIn}
@@ -348,21 +313,6 @@ export default function Catalog() {
         onClose={() => setShowCreatePost(false)}
         onCreatePost={handleCreatePost}
       />
-
-      {showReviewForm && itemToReview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="max-w-xl w-full">
-            <ReviewForm
-              post={itemToReview}
-              onSubmit={handleSubmitReview}
-              onCancel={() => {
-                setShowReviewForm(false);
-                setItemToReview(null);
-              }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* User Profile Modal */}
       {viewingProfileUserId && (

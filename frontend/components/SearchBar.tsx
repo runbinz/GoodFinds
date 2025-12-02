@@ -1,7 +1,6 @@
 import { Search, Filter } from 'lucide-react';
 import { useState } from 'react';
 
-const statusOptions = ['All', 'Available', 'Claimed'];
 const conditionOptions = ['All', 'New', 'Like New', 'Good', 'Fair', 'Used'];
 
 interface SearchBarProps {
@@ -10,8 +9,6 @@ interface SearchBarProps {
   category: string;
   onCategoryChange: (category: string) => void;
   categories: string[];
-  status: string;
-  onStatusChange: (status: string) => void;
   condition: string;
   onConditionChange: (condition: string) => void;
   isSignedIn?: boolean;
@@ -24,8 +21,6 @@ export default function SearchBar({
   category, 
   onCategoryChange, 
   categories,
-  status,
-  onStatusChange,
   condition,
   onConditionChange,
   isSignedIn = false,
@@ -49,16 +44,16 @@ export default function SearchBar({
         <button
           onClick={() => setShowFilters(!showFilters)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-            showFilters || status !== 'All' || condition !== 'All'
+            showFilters || condition !== 'All'
               ? 'bg-emerald-100 text-emerald-700'
               : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           <Filter size={18} />
           Filters
-          {(status !== 'All' || condition !== 'All') && (
+          {condition !== 'All' && (
             <span className="bg-emerald-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-              {(status !== 'All' ? 1 : 0) + (condition !== 'All' ? 1 : 0)}
+              1
             </span>
           )}
         </button>
@@ -91,25 +86,7 @@ export default function SearchBar({
 
       {/* Additional Filters */}
       {showFilters && (
-        <div className="mt-4 pt-4 border-t border-gray-200 grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-            <div className="flex gap-2 flex-wrap">
-              {statusOptions.map(opt => (
-                <button
-                  key={opt}
-                  onClick={() => onStatusChange(opt)}
-                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                    status === opt 
-                      ? 'bg-emerald-600 text-white' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="mt-4 pt-4 border-t border-gray-200">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Condition</label>
             <div className="flex gap-2 flex-wrap">
