@@ -18,15 +18,19 @@ def event_loop():
 async def mock_db():
     mock_database = MagicMock()
     
-    mock_posts_collection = AsyncMock()
-    mock_reviews_collection = AsyncMock()
-    mock_users_collection = AsyncMock()
+    mock_posts_collection = MagicMock()
+    mock_reviews_collection = MagicMock()
+    mock_users_collection = MagicMock()
     
     mock_database.posts = mock_posts_collection
     mock_database.reviews = mock_reviews_collection
     mock_database.users = mock_users_collection
     
-    with patch.object(db, 'database', mock_database):
+    # Patch the collection getter functions used by routes to return our mocks
+    with patch.object(db, 'database', mock_database), \
+         patch('db.get_posts_collection', return_value=mock_posts_collection), \
+         patch('db.get_reviews_collection', return_value=mock_reviews_collection), \
+         patch('db.get_users_collection', return_value=mock_users_collection):
         yield mock_database
 
 
