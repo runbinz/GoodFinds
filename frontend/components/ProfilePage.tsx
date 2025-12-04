@@ -180,7 +180,6 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      {/* User Info & Reputation Card */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-3xl font-bold mb-4">Your Profile</h2>
         <div className="grid md:grid-cols-2 gap-6">
@@ -208,7 +207,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Items Tabs */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
           <div className="flex">
@@ -343,10 +341,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Reviews Section */}
       <ReviewList reviews={reviews} title="Reviews Received" />
 
-      {/* Edit Post Modal */}
       {editingPost && (
         <EditPostModal
           post={editingPost}
@@ -355,7 +351,6 @@ export default function ProfilePage() {
         />
       )}
 
-      {/* Delete Confirmation Modal */}
       {deletingPostId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -381,7 +376,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Pickup Confirmation Modal */}
       {pickupPostId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
@@ -412,7 +406,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Review Form Modal */}
       {showReviewForm && itemToReview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="max-w-xl w-full">

@@ -36,7 +36,6 @@ export default function Card({ item, posterReputation, posterReviewCount, onClic
         </h3>
         <div className="text-sm text-gray-600 mb-2">{item.category || 'Other'}</div>
         
-        {/* Poster Reputation */}
         {posterReputation !== undefined && posterReviewCount !== undefined && posterReviewCount > 0 && (
           <div className="flex items-center gap-1 text-sm text-gray-700 mb-2">
             <span className="text-gray-500">Poster: </span>
