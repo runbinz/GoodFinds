@@ -39,6 +39,7 @@ export default function Card({ item, posterReputation, posterReviewCount, onClic
         {/* Poster Reputation */}
         {posterReputation !== undefined && posterReviewCount !== undefined && posterReviewCount > 0 && (
           <div className="flex items-center gap-1 text-sm text-gray-700 mb-2">
+            <span className="text-gray-500">Poster: </span>
             <Star size={14} className="fill-yellow-400 text-yellow-400" />
             <span className="font-semibold">{posterReputation.toFixed(1)}</span>
             <span className="text-gray-500">({posterReviewCount} review{posterReviewCount !== 1 ? 's' : ''})</span>
