@@ -24,7 +24,7 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
   const [condition, setCondition] = useState(conditions[0]);
   const [location, setLocation] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [imagePreview, setImagePreview] = useState<string>('');
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -75,14 +75,34 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return alert('File must be under 5MB');
-    if (!file.type.startsWith('image/')) return alert('Please select an image');
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => setImagePreview(reader.result as string);
-    reader.readAsDataURL(file);
+    const validFiles = files.filter(file => {
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Max size is 5MB.`);
+        return false;
+      }
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image.`);
+        return false;
+      }
+      return true;
+    });
+
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -92,7 +112,7 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     onCreatePost({
       item_title: title,
       description: description || undefined,
-      images: imagePreview ? [imagePreview] : [],
+      images: imagePreviews,
       category: category || undefined,
       condition,
       location,
@@ -103,7 +123,7 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     setCategory(categories[0]);
     setCondition(conditions[0]);
     setLocation('');
-    setImagePreview('');
+    setImagePreviews([]);
     setSuggestions([]);
   };
 
@@ -188,21 +208,34 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Image</label>
-            {!imagePreview ? (
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Images ({imagePreviews.length}/5)
+            </label>
+            
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                {imagePreviews.map((preview, index) => (
+                  <div key={index} className="relative">
+                    <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-32 object-cover rounded-lg" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {imagePreviews.length < 5 && (
               <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
                 <Upload size={32} className="text-gray-400 mb-2" />
-                <span className="text-sm text-gray-500">Click to upload image</span>
-                <span className="text-xs text-gray-400 mt-1">Max size: 5MB</span>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                <span className="text-sm text-gray-500">Click to upload images</span>
+                <span className="text-xs text-gray-400 mt-1">Max 5 images</span>
+                <input type="file" accept="image/*" multiple onChange={handleFileChange} className="hidden" />
               </label>
-            ) : (
-              <div className="relative">
-                <img src={imagePreview} alt="Preview" className="w-full h-48 object-cover rounded-lg" />
-                <button type="button" onClick={() => setImagePreview('')} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full hover:bg-red-600">
-                  <X size={16} />
-                </button>
-              </div>
             )}
           </div>
 
