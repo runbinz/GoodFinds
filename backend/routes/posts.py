@@ -1,13 +1,17 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Set
 from datetime import datetime
 from db import get_posts_collection
-from models import Post
+from models import Post, CreatePostRequest, UpdatePostRequest
 from auth import get_current_user
 
 router = APIRouter(prefix="/posts", tags=["posts"])
+
+# automatically taken down after being reported three times
+MISSING_THRESHOLD = 3
+
 
 # Request models
 class CreatePostRequest(BaseModel):
@@ -40,7 +44,9 @@ def post_to_response(post_doc) -> Post:
         condition=post_doc["condition"],
         location=post_doc["location"],
         claimed_by=post_doc.get("claimed_by"),
-        status=post_doc["status"]
+        status=post_doc["status"],
+        missing_count=post_doc.get("missing_count", 0),
+        missing_reporters=post_doc.get("missing_reporters", []),
     )
 
 
@@ -232,6 +238,44 @@ async def confirm_pickup(
         raise HTTPException(status_code=500, detail="Failed to delete post")
     
     return {"message": "Item picked up successfully", "post_id": post_id}
+
+@router.patch("/{post_id}/missing", response_model=Post)
+async def report_missing(
+    post_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    posts = get_posts_collection()
+
+    try:
+        oid = ObjectId(post_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    post = await posts.find_one({"_id": oid})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post.get("status") != "available":
+        raise HTTPException(status_code=400, detail="Item is not available to report")
+
+    reporters: Set[str] = set(post.get("missing_reporters", []))
+    if current_user["id"] in reporters:
+        updated = post
+    else:
+        reporters.add(current_user["id"])
+        new_missing_count = int(post.get("missing_count", 0)) + 1
+
+        update_doc = {
+            "missing_reporters": list(reporters),
+            "missing_count": new_missing_count,
+        }
+        if new_missing_count >= MISSING_THRESHOLD:
+            update_doc["status"] = "removed"
+
+        await posts.update_one({"_id": oid}, {"$set": update_doc})
+        updated = await posts.find_one({"_id": oid})
+
+    return post_to_response(updated)
 
 
 @router.delete("/{post_id}", status_code=204)

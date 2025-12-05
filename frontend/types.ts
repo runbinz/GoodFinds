@@ -43,6 +43,8 @@ export interface Post {
   location: string;
   claimed_by?: string;
   status: string;
+  missing_count?: number;
+  missing_reporters?: string[];
 }
 
 export const categories = [

@@ -73,7 +73,18 @@ export default function Catalog() {
     const matchesCategory = category === 'All' || p.category === category;
     const matchesCondition = condition === 'All' || p.condition === condition;
     
-    return matchesSearch && matchesCategory && matchesCondition && p.status === 'available';
+    // Only show available items in public catalog
+    // If the current user has already reported this post, it will no longer be displayed to that user after refreshing
+        const reportedByMe =
+      !!user?.id && (p.missing_reporters ?? []).includes(user.id);
+
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesCondition &&
+      p.status === 'available' &&
+      !reportedByMe
+    );
   });
 
   const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
@@ -102,6 +113,31 @@ export default function Catalog() {
     }
   };
 
+  // Report missing handler
+    const handleReportMissing = async () => {
+    if (!isSignedIn || !user) {
+      alert('Please sign in to report missing items.');
+      return;
+    }
+
+    if (!selectedItem) return;
+
+    try {
+      const updatedPost = await authenticatedPosts.reportMissing(selectedItem.id);
+
+      // Remove this item from the current list (as it has been reported to be missing/may no longer be available)
+      setItems(items.filter(item => item.id !== updatedPost.id));
+      setSelectedItem(null);
+
+      alert('Thanks! The item has been reported as missing.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to report missing');
+      console.error('Error reporting missing:', err);
+    }
+  };
+
+
+  // Create new post handler
   const handleCreatePost = async (newItem: CreatePostData) => {
     if (!isSignedIn || !user) {
       alert('Please sign in to create posts');
@@ -287,7 +323,20 @@ export default function Catalog() {
                   Awaiting Pickup
                 </button>
               )}
-              
+
+              {/* Loss report button: An independent button */}
+              <button
+                onClick={handleReportMissing}
+                disabled={!isSignedIn || isOwnPost}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
+                  isSignedIn && !isOwnPost
+                    ? 'bg-red-500 text-white hover:bg-red-600'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Report Missing
+              </button>
+
               <button 
                 onClick={() => setSelectedItem(null)} 
                 className="flex-1 bg-gray-200 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"

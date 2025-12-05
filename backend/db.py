@@ -21,7 +21,7 @@ async def connect_db():
     print(">>> USING MONGODB_URL =", mongodb_url)
 
     # Use certifi for SSL certificate verification
-    db_client = AsyncIOMotorClient(mongodb_url, tlsCAFile=certifi.where())
+    db_client = AsyncIOMotorClient(mongodb_url)
     database = db_client["goodfinds"]
     
     # Test the connection
