@@ -30,7 +30,6 @@ export default function Catalog() {
   const [posterReputations, setPosterReputations] = useState<Map<string, User>>(new Map());
   const [viewingProfileUserId, setViewingProfileUserId] = useState<string | null>(null);
 
-  // Fetch posts from backend
   useEffect(() => {
     fetchPosts();
   }, []);
@@ -42,8 +41,7 @@ export default function Catalog() {
       const posts = await publicPostsAPI.getAll();
       console.log('Posts fetched:', posts);
       setItems(posts);
-      
-      // Fetch reputation data for all unique posters
+
       const uniqueOwnerIds = [...new Set(posts.map(post => post.owner_id))];
       const reputationMap = new Map<string, User>();
       
@@ -70,7 +68,6 @@ export default function Catalog() {
     }
   };
 
-  // Client-side filtering - only show available items in public catalog
   const filtered = items.filter(p => {
     const matchesSearch = p.item_title.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === 'All' || p.category === category;
@@ -90,10 +87,8 @@ export default function Catalog() {
     );
   });
 
-  // Check if user is the owner of the selected item
   const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
 
-  // Claim item handler
   const handleClaim = async () => {
     if (!isSignedIn || !user) {
       alert('Please sign in to claim items');
@@ -253,7 +248,6 @@ export default function Catalog() {
             
             <h2 className="text-2xl font-bold mb-4">{selectedItem.item_title}</h2>
             
-            {/* Poster Info - Clickable to view profile */}
             <div className="mb-4 p-3 bg-gray-50 rounded-lg">
               <button
                 onClick={() => {
@@ -360,7 +354,6 @@ export default function Catalog() {
         onCreatePost={handleCreatePost}
       />
 
-      {/* User Profile Modal */}
       {viewingProfileUserId && (
         <UserProfileModal
           userId={viewingProfileUserId}
