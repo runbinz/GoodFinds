@@ -23,6 +23,8 @@ class Post(BaseModel):
     location: str
     claimed_by: Optional[str] = None
     status: str
+    missing_count: int = 0
+    missing_reporters: List[str] = []
 
 
 class Review(BaseModel):
