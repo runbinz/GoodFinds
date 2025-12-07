@@ -41,10 +41,12 @@ export interface Post {
   category?: string;
   condition: string;
   location: string;
-  claimed_by?: string;
-  status: string;
   missing_count?: number;
   missing_reporters?: string[];
+  // status: string;
+  status: 'available' | 'claimed' | 'removed';
+  // claimed_by?: string;
+  claimed_by?: string | null;
 }
 
 export const categories = [
