@@ -78,10 +78,6 @@ async def create_post(
     """Create a new post (requires authentication)"""
     posts = get_posts_collection()
 
-    # Debug log to verify frontend request body
-    print("📩 Received create post request:", post.dict())
-    print("📩 Authenticated user:", current_user["id"])
-
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
@@ -147,6 +143,41 @@ async def claim_post(
     
     if result.modified_count == 0:
         raise HTTPException(status_code=500, detail="Failed to claim post")
+    
+    updated_post = await posts.find_one({"_id": ObjectId(post_id)})
+    return post_to_response(updated_post)
+
+
+@router.post("/{post_id}/unclaim", response_model=Post)
+async def unclaim_post(
+    post_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Unclaim a post (requires authentication, only claimer can unclaim)"""
+    posts = get_posts_collection()
+    
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    # Only the claimer can unclaim the post
+    if post.get("claimed_by") != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the claimer can unclaim this post")
+    
+    if post["status"] != "claimed":
+        raise HTTPException(status_code=400, detail="Only claimed items can be unclaimed")
+    
+    result = await posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": {"claimed_by": None, "status": "available"}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to unclaim post")
     
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
     return post_to_response(updated_post)
@@ -256,7 +287,7 @@ async def report_missing(
         raise HTTPException(status_code=404, detail="Post not found")
     
     if post.get("status") != "claimed":
-        raise HTTPException(status_code=400, detail="Only claimed items can be reported missing")
+        raise HTTPException(status_code=400, detail="Reported missing.")
     
     # Only the person who claims can report
     claimed_by = post.get("claimed_by")
@@ -268,7 +299,8 @@ async def report_missing(
 
     reporters: Set[str] = set(post.get("missing_reporters", []))
     if current_user["id"] in reporters:
-        updated = post
+        # User already reported this item, return current state
+        updated = await posts.find_one({"_id": oid})
     else:
         reporters.add(current_user["id"])
         new_missing_count = int(post.get("missing_count", 0)) + 1
@@ -276,12 +308,16 @@ async def report_missing(
         update_doc = {
             "missing_reporters": list(reporters),
             "missing_count": new_missing_count,
+            "claimed_by": None,
+            "status": "available",
         }
         if new_missing_count >= MISSING_THRESHOLD:
             update_doc["status"] = "removed"
 
-        await posts.update_one({"_id": oid}, {"$set": update_doc})
+        result = await posts.update_one({"_id": oid}, {"$set": update_doc})
+        print(f"📝 Update result - modified_count: {result.modified_count}, matched_count: {result.matched_count}")
         updated = await posts.find_one({"_id": oid})
+        print(f"📝 After update - claimed_by: {updated.get('claimed_by')}, status: {updated.get('status')}, missing_reporters: {updated.get('missing_reporters')}")
 
     return post_to_response(updated)
 

@@ -54,8 +54,7 @@ export default function ProfilePage() {
 
       // Filter claimed items (claimed by user)
       const claimed = allPosts.filter(post => {
-        const reportedByMe = (post.missing_reporters ?? []).includes(user.id);
-        return post.claimed_by === user.id && !reportedByMe;
+        return post.claimed_by === user.id;
       });
       setClaimedItems(claimed);
 
@@ -133,33 +132,35 @@ export default function ProfilePage() {
     }
   };
 
+  const handleUnclaim = async (postId: string) => {
+    try {
+      await authenticatedPosts.unclaim(postId);
+      setClaimedItems(claimedItems.filter(item => item.id !== postId));
+      alert('Item unclaimed successfully.');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to unclaim item';
+      alert(`Error: ${errorMessage}`);
+    }
+  };
+
   // Report missing (after confirm)
   const handleReportMissingFromProfile = async () => {
     if (!user || !reportMissingPostId) return;
 
+    const postId = reportMissingPostId;
+
     try {
-      const handleReportMissingFromProfile = async () => {
-        if (!user || !reportMissingPostId) return;
-
-        const postId = reportMissingPostId; // 先保存，避免后面 state 变了
-
-        try {
-          await authenticatedPosts.reportMissing(postId);
-          setClaimedItems(prev => prev.filter(item => item.id !== postId));
-          alert('Thanks! This item has been reported as missing.');
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Failed to report missing';
-          alert(msg);
-        } finally {
-          setReportMissingPostId(null);
-        }
-      };
-
-
-      alert("Thanks! This item has been reported as missing.");
-
+      // First report as missing (while still claimed)
+      await authenticatedPosts.reportMissing(postId);
+      
+      // Then unclaim the item
+      await authenticatedPosts.unclaim(postId);
+      
+      // Remove from claimed items immediately
+      setClaimedItems(claimedItems.filter(item => item.id !== postId));
+      alert('Thanks! This item has been unclaimed and reported as missing.');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to report missing";
+      const msg = err instanceof Error ? err.message : 'Failed to report missing';
       alert(msg);
     } finally {
       setReportMissingPostId(null);
@@ -371,13 +372,22 @@ export default function ProfilePage() {
                           </button>
                         </div>
 
-                        <button
-                          onClick={() => setReportMissingPostId(item.id)}
-                          className="w-full px-3 py-2 text-xs font-semibold rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                          title="Report that this item was missing when you went to pick it up"
-                        >
-                          Report Missing
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setReportMissingPostId(item.id)}
+                            className="flex-1 px-3 py-2 text-xs font-semibold rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                            title="Report that this item was missing when you went to pick it up"
+                          >
+                            Report Missing
+                          </button>
+                          <button
+                            onClick={() => handleUnclaim(item.id)}
+                            className="flex-1 px-3 py-2 text-xs font-semibold rounded border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+                            title="Unclaim this item"
+                          >
+                            Unclaim
+                          </button>
+                        </div>
 
                       </div>
                       

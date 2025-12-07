@@ -90,6 +90,15 @@ export function useAuthenticatedPosts() {
       });
     },
 
+    // Unclaim post (user ID comes from auth token)
+    unclaim: async (postId: string): Promise<Post> => {
+      return authenticatedRequest<Post>(`/posts/${postId}/unclaim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+    },
+
     // Delete post (user ID comes from auth token)
     delete: async (postId: string): Promise<void> => {
       return authenticatedRequest<void>(`/posts/${postId}`, {

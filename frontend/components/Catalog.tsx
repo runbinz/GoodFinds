@@ -37,9 +37,7 @@ export default function Catalog() {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      console.log('Fetching posts from API...');
       const posts = await publicPostsAPI.getAll();
-      console.log('Posts fetched:', posts);
       setItems(posts);
 
       const uniqueOwnerIds = [...new Set(posts.map(post => post.owner_id))];
@@ -73,44 +71,17 @@ export default function Catalog() {
     const matchesCategory = category === 'All' || p.category === category;
     const matchesCondition = condition === 'All' || p.condition === condition;
     
-    // Only show available items in public catalog
-    // If the current user has already reported this post, it will no longer be displayed to that user after refreshing
-        const reportedByMe =
-      !!user?.id && (p.missing_reporters ?? []).includes(user.id);
-
+    // Show available or claimed items in public catalog
     return (
       matchesSearch &&
       matchesCategory &&
       matchesCondition &&
-      p.status === 'available' &&
-      !reportedByMe
+      (p.status === 'available' || p.status === 'claimed')
     );
   });
 
   const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
-  const userId = user?.id;
-  const reportMissingGate = React.useMemo(() => {
-    if (!selectedItem) return { canReport: false, hint: '' };
-    if (!isSignedIn || !userId) {
-      return { canReport: false, hint: 'Sign in to report missing' };
-    }
-    if (selectedItem.owner_id === userId) {
-      return { canReport: false, hint: "You can't report your own listing" };
-    }
-    if (selectedItem.status !== 'claimed') {
-      return { canReport: false, hint: 'You can only report missing after the item is claimed' };
-    }
-    if (!selectedItem.claimed_by) {
-      return { canReport: false, hint: 'Claimed item missing claimed_by (data issue)' };
-    }
-    if (selectedItem.claimed_by !== userId) {
-      return { canReport: false, hint: 'Only the claimer can report missing' };
-    }
-    if ((selectedItem.missing_reporters ?? []).includes(userId)) {
-      return { canReport: false, hint: 'You already reported this item' };
-    }
-    return { canReport: true, hint: '' };
-  }, [selectedItem, isSignedIn, userId]);
+  const isClaimer = selectedItem && user && selectedItem.claimed_by === user.id;
 
 
   const handleClaim = async () => {
@@ -137,34 +108,26 @@ export default function Catalog() {
     }
   };
 
-  // Report missing handler
-  const handleReportMissing = async () => {
-    
-    if (!reportMissingGate.canReport) {
-      if (reportMissingGate.hint) alert(reportMissingGate.hint);
-      return;
-    }
-
+  const handleUnclaim = async () => {
     if (!isSignedIn || !user) {
-      alert('Please sign in to report missing items.');
+      alert('Please sign in to unclaim items');
       return;
     }
 
     if (!selectedItem) return;
 
     try {
-      const updatedPost = await authenticatedPosts.reportMissing(selectedItem.id);
-
-      // Remove this item from the current list (as it has been reported to be missing/may no longer be available)
-      setItems(items.filter(item => item.id !== updatedPost.id));
-      setSelectedItem(null);
-
-      alert('Thanks! The item has been reported as missing.');
+      const updatedPost = await authenticatedPosts.unclaim(selectedItem.id);
+      setItems(items.map(item => item.id === updatedPost.id ? updatedPost : item));
+      setSelectedItem(updatedPost);
+      alert('Item unclaimed successfully.');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to report missing');
-      console.error('Error reporting missing:', err);
+      alert(err instanceof Error ? err.message : 'Failed to unclaim item');
+      console.error('Error unclaiming post:', err);
     }
   };
+
+
 
 
   // Create new post handler
@@ -179,7 +142,6 @@ export default function Catalog() {
     try {
       const createdPost = await authenticatedPosts.create(newItem);
 
-      console.log('Post created successfully:', createdPost);
       setItems([createdPost, ...items]);
       setShowCreatePost(false);
       alert('Post created successfully!');
@@ -316,6 +278,16 @@ export default function Catalog() {
               <div className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
                 <p className="font-semibold">This item has been claimed</p>
                 <p className="text-sm mt-1">Awaiting pickup by the claimer</p>
+                {selectedItem.missing_reporters && selectedItem.missing_reporters.length > 0 && (
+                  <p className="text-sm mt-2 text-red-600 font-semibold">Users have reported this item as missing</p>
+                )}
+              </div>
+            )}
+
+            {selectedItem.status === 'available' && selectedItem.missing_reporters && selectedItem.missing_reporters.length > 0 && (
+              <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200">
+                <p className="font-semibold">Reported Missing</p>
+                <p className="text-sm mt-1">This item was reported as missing. The previous claimer unclaimed it.</p>
               </div>
             )}
 
@@ -336,7 +308,7 @@ export default function Catalog() {
               {selectedItem.status !== 'claimed' ? (
                 <button 
                   onClick={handleClaim} 
-                  disabled={!isSignedIn || isOwnPost}
+                  disabled={!isSignedIn || !!isOwnPost}
                   className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
                     isSignedIn && !isOwnPost
                       ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
@@ -346,33 +318,23 @@ export default function Catalog() {
                   {!isSignedIn ? 'Sign In to Claim' : isOwnPost ? 'Your Listing' : 'Claim Item'}
                 </button>
               ) : (
-                <button 
-                  className="flex-1 bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed"
-                  disabled
-                >
-                  Awaiting Pickup
-                </button>
+                <div className="flex-1 flex gap-2">
+                  <button 
+                    className="flex-1 bg-amber-500 text-white px-6 py-3 rounded-lg font-semibold cursor-not-allowed"
+                    disabled
+                  >
+                    Awaiting Pickup
+                  </button>
+                  {isClaimer && (
+                    <button
+                      onClick={handleUnclaim}
+                      className="px-6 py-3 rounded-lg font-semibold bg-gray-500 text-white hover:bg-gray-600 transition-colors"
+                    >
+                      Unclaim
+                    </button>
+                  )}
+                </div>
               )}
-
-              {/* Report Missing (always visible, but gated/disabled with hint) */}
-              <div className="flex-1">
-                <button
-                  onClick={handleReportMissing}
-                  disabled={!reportMissingGate.canReport}
-                  title={!reportMissingGate.canReport ? reportMissingGate.hint : ''}
-                  className={`w-full px-6 py-3 rounded-lg font-semibold transition-colors ${
-                  reportMissingGate.canReport
-                    ? 'bg-red-500 text-white hover:bg-red-600'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  Report Missing
-                </button>
-
-              {!reportMissingGate.canReport && reportMissingGate.hint && (
-                <div className="mt-1 text-xs text-gray-500">{reportMissingGate.hint}</div>
-              )}
-             </div>
 
               <button 
                 onClick={() => setSelectedItem(null)} 
