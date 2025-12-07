@@ -37,9 +37,7 @@ export default function Catalog() {
   const fetchPosts = async () => {
     try {
       setLoading(true);
-      console.log('Fetching posts from API...');
       const posts = await publicPostsAPI.getAll();
-      console.log('Posts fetched:', posts);
       setItems(posts);
 
       const uniqueOwnerIds = [...new Set(posts.map(post => post.owner_id))];
@@ -84,29 +82,6 @@ export default function Catalog() {
 
   const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
   const isClaimer = selectedItem && user && selectedItem.claimed_by === user.id;
-  const userId = user?.id;
-  const reportMissingGate = React.useMemo(() => {
-    if (!selectedItem) return { canReport: false, hint: '' };
-    if (!isSignedIn || !userId) {
-      return { canReport: false, hint: 'Sign in to report missing' };
-    }
-    if (selectedItem.owner_id === userId) {
-      return { canReport: false, hint: "You can't report your own listing" };
-    }
-    if (selectedItem.status !== 'claimed') {
-      return { canReport: false, hint: 'You can only report missing after the item is claimed' };
-    }
-    if (!selectedItem.claimed_by) {
-      return { canReport: false, hint: 'Claimed item missing claimed_by (data issue)' };
-    }
-    if (selectedItem.claimed_by !== userId) {
-      return { canReport: false, hint: 'Only the claimer can report missing' };
-    }
-    if ((selectedItem.missing_reporters ?? []).includes(userId)) {
-      return { canReport: false, hint: 'You already reported this item' };
-    }
-    return { canReport: true, hint: '' };
-  }, [selectedItem, isSignedIn, userId]);
 
 
   const handleClaim = async () => {
@@ -152,34 +127,7 @@ export default function Catalog() {
     }
   };
 
-  // Report missing handler
-  const handleReportMissing = async () => {
-    
-    if (!reportMissingGate.canReport) {
-      if (reportMissingGate.hint) alert(reportMissingGate.hint);
-      return;
-    }
 
-    if (!isSignedIn || !user) {
-      alert('Please sign in to report missing items.');
-      return;
-    }
-
-    if (!selectedItem) return;
-
-    try {
-      const updatedPost = await authenticatedPosts.reportMissing(selectedItem.id);
-
-      // Remove this item from the current list (as it has been reported to be missing/may no longer be available)
-      setItems(items.filter(item => item.id !== updatedPost.id));
-      setSelectedItem(null);
-
-      alert('Thanks! The item has been reported as missing.');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to report missing');
-      console.error('Error reporting missing:', err);
-    }
-  };
 
 
   // Create new post handler
@@ -194,7 +142,6 @@ export default function Catalog() {
     try {
       const createdPost = await authenticatedPosts.create(newItem);
 
-      console.log('Post created successfully:', createdPost);
       setItems([createdPost, ...items]);
       setShowCreatePost(false);
       alert('Post created successfully!');
@@ -332,7 +279,7 @@ export default function Catalog() {
                 <p className="font-semibold">This item has been claimed</p>
                 <p className="text-sm mt-1">Awaiting pickup by the claimer</p>
                 {selectedItem.missing_reporters && selectedItem.missing_reporters.length > 0 && (
-                  <p className="text-sm mt-2 text-red-600 font-semibold">Reported missing by {selectedItem.missing_reporters.length} user{selectedItem.missing_reporters.length !== 1 ? 's' : ''}</p>
+                  <p className="text-sm mt-2 text-red-600 font-semibold">Users have reported this item as missing</p>
                 )}
               </div>
             )}

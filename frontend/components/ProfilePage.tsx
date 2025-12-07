@@ -150,18 +150,17 @@ export default function ProfilePage() {
     const postId = reportMissingPostId;
 
     try {
-      console.log('Reporting missing and unclaiming for post:', postId);
-      
-      // Report as missing first (while still claimed)
+      // First report as missing (while still claimed)
       await authenticatedPosts.reportMissing(postId);
-      console.log('Item reported as missing');
+      
+      // Then unclaim the item
+      await authenticatedPosts.unclaim(postId);
       
       // Remove from claimed items immediately
       setClaimedItems(claimedItems.filter(item => item.id !== postId));
       alert('Thanks! This item has been unclaimed and reported as missing.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to report missing';
-      console.error('Error reporting missing:', err);
       alert(msg);
     } finally {
       setReportMissingPostId(null);

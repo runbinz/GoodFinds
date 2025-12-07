@@ -78,10 +78,6 @@ async def create_post(
     """Create a new post (requires authentication)"""
     posts = get_posts_collection()
 
-    # Debug log to verify frontend request body
-    print("📩 Received create post request:", post.dict())
-    print("📩 Authenticated user:", current_user["id"])
-
     post_doc = {
         "item_title": post.item_title,
         "description": post.description,
@@ -318,11 +314,10 @@ async def report_missing(
         if new_missing_count >= MISSING_THRESHOLD:
             update_doc["status"] = "removed"
 
-        print(f"📝 Updating post {post_id} with: {update_doc}")
         result = await posts.update_one({"_id": oid}, {"$set": update_doc})
-        print(f"📝 Update result: {result.modified_count} documents modified")
+        print(f"📝 Update result - modified_count: {result.modified_count}, matched_count: {result.matched_count}")
         updated = await posts.find_one({"_id": oid})
-        print(f"📝 Updated post: claimed_by={updated.get('claimed_by')}, status={updated.get('status')}")
+        print(f"📝 After update - claimed_by: {updated.get('claimed_by')}, status: {updated.get('status')}, missing_reporters: {updated.get('missing_reporters')}")
 
     return post_to_response(updated)
 
