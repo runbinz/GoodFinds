@@ -26,6 +26,8 @@ export default function ProfilePage() {
   const [pickupPostId, setPickupPostId] = useState<string | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [itemToReview, setItemToReview] = useState<Post | null>(null);
+  const [reportMissingPostId, setReportMissingPostId] = useState<string | null>(null);
+
 
   useEffect(() => {
     if (isSignedIn && user) {
@@ -51,8 +53,12 @@ export default function ProfilePage() {
       setPostedItems(posted);
 
       // Filter claimed items (claimed by user)
-      const claimed = allPosts.filter(post => post.claimed_by === user.id);
+      const claimed = allPosts.filter(post => {
+        const reportedByMe = (post.missing_reporters ?? []).includes(user.id);
+        return post.claimed_by === user.id && !reportedByMe;
+      });
       setClaimedItems(claimed);
+
 
       // Load reviews
       const userReviews = await publicReviewsAPI.getByPosterId(user.id);
@@ -126,6 +132,40 @@ export default function ProfilePage() {
       alert(`Error: ${errorMessage}`);
     }
   };
+
+  // Report missing (after confirm)
+  const handleReportMissingFromProfile = async () => {
+    if (!user || !reportMissingPostId) return;
+
+    try {
+      const handleReportMissingFromProfile = async () => {
+        if (!user || !reportMissingPostId) return;
+
+        const postId = reportMissingPostId; // 先保存，避免后面 state 变了
+
+        try {
+          await authenticatedPosts.reportMissing(postId);
+          setClaimedItems(prev => prev.filter(item => item.id !== postId));
+          alert('Thanks! This item has been reported as missing.');
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Failed to report missing';
+          alert(msg);
+        } finally {
+          setReportMissingPostId(null);
+        }
+      };
+
+
+      alert("Thanks! This item has been reported as missing.");
+
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to report missing";
+      alert(msg);
+    } finally {
+      setReportMissingPostId(null);
+    }
+  };
+
 
   const handleSubmitReview = async (rating: number, comment: string) => {
     if (!user || !itemToReview) return;
@@ -315,19 +355,32 @@ export default function ProfilePage() {
                     <div className="p-4">
                       <h3 className="font-semibold mb-1">{item.item_title}</h3>
                       <p className="text-sm text-gray-600 mb-2">{item.category}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="inline-block px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
-                          Awaiting Pickup
-                        </span>
+                      
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-block px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-700">
+                            Awaiting Pickup
+                          </span>
+                          <button
+                            onClick={() => setPickupPostId(item.id)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
+                            title="Confirm you picked up the item"
+                          >
+                            <CheckCircle size={14} />
+                            I Picked It Up
+                          </button>
+                        </div>
+
                         <button
-                          onClick={() => setPickupPostId(item.id)}
-                          className="flex items-center gap-1 px-2 py-1 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors"
-                          title="Confirm you picked up the item"
+                          onClick={() => setReportMissingPostId(item.id)}
+                          className="w-full px-3 py-2 text-xs font-semibold rounded border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                          title="Report that this item was missing when you went to pick it up"
                         >
-                          <CheckCircle size={14} />
-                          I Picked It Up
+                          Report Missing
                         </button>
+
                       </div>
+                      
                     </div>
                   </div>
                 ))
@@ -405,6 +458,37 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+            {reportMissingPostId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                <CheckCircle size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold">Report Item as Missing?</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to report this item as missing? This will hide the listing from the catalog, but the record will still be kept in our system.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleReportMissingFromProfile}
+                className="flex-1 bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition-colors"
+              >
+                Yes, Report Missing
+              </button>
+              <button
+                onClick={() => setReportMissingPostId(null)}
+                className="flex-1 bg-gray-200 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {showReviewForm && itemToReview && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

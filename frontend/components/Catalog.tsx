@@ -88,6 +88,30 @@ export default function Catalog() {
   });
 
   const isOwnPost = selectedItem && user && selectedItem.owner_id === user.id;
+  const userId = user?.id;
+  const reportMissingGate = React.useMemo(() => {
+    if (!selectedItem) return { canReport: false, hint: '' };
+    if (!isSignedIn || !userId) {
+      return { canReport: false, hint: 'Sign in to report missing' };
+    }
+    if (selectedItem.owner_id === userId) {
+      return { canReport: false, hint: "You can't report your own listing" };
+    }
+    if (selectedItem.status !== 'claimed') {
+      return { canReport: false, hint: 'You can only report missing after the item is claimed' };
+    }
+    if (!selectedItem.claimed_by) {
+      return { canReport: false, hint: 'Claimed item missing claimed_by (data issue)' };
+    }
+    if (selectedItem.claimed_by !== userId) {
+      return { canReport: false, hint: 'Only the claimer can report missing' };
+    }
+    if ((selectedItem.missing_reporters ?? []).includes(userId)) {
+      return { canReport: false, hint: 'You already reported this item' };
+    }
+    return { canReport: true, hint: '' };
+  }, [selectedItem, isSignedIn, userId]);
+
 
   const handleClaim = async () => {
     if (!isSignedIn || !user) {
@@ -114,7 +138,13 @@ export default function Catalog() {
   };
 
   // Report missing handler
-    const handleReportMissing = async () => {
+  const handleReportMissing = async () => {
+    
+    if (!reportMissingGate.canReport) {
+      if (reportMissingGate.hint) alert(reportMissingGate.hint);
+      return;
+    }
+
     if (!isSignedIn || !user) {
       alert('Please sign in to report missing items.');
       return;
@@ -324,18 +354,25 @@ export default function Catalog() {
                 </button>
               )}
 
-              {/* Loss report button: An independent button */}
-              <button
-                onClick={handleReportMissing}
-                disabled={!isSignedIn || isOwnPost}
-                className={`flex-1 px-6 py-3 rounded-lg font-semibold transition-colors ${
-                  isSignedIn && !isOwnPost
+              {/* Report Missing (always visible, but gated/disabled with hint) */}
+              <div className="flex-1">
+                <button
+                  onClick={handleReportMissing}
+                  disabled={!reportMissingGate.canReport}
+                  title={!reportMissingGate.canReport ? reportMissingGate.hint : ''}
+                  className={`w-full px-6 py-3 rounded-lg font-semibold transition-colors ${
+                  reportMissingGate.canReport
                     ? 'bg-red-500 text-white hover:bg-red-600'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                Report Missing
-              </button>
+                  }`}
+                >
+                  Report Missing
+                </button>
+
+              {!reportMissingGate.canReport && reportMissingGate.hint && (
+                <div className="mt-1 text-xs text-gray-500">{reportMissingGate.hint}</div>
+              )}
+             </div>
 
               <button 
                 onClick={() => setSelectedItem(null)} 

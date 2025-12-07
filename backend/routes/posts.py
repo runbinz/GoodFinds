@@ -254,9 +254,17 @@ async def report_missing(
     post = await posts.find_one({"_id": oid})
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+    
+    if post.get("status") != "claimed":
+        raise HTTPException(status_code=400, detail="Only claimed items can be reported missing")
+    
+    # Only the person who claims can report
+    claimed_by = post.get("claimed_by")
+    if not claimed_by:
+        raise HTTPException(status_code=400, detail="Post is claimed but missing claimed_by")
 
-    if post.get("status") != "available":
-        raise HTTPException(status_code=400, detail="Item is not available to report")
+    if claimed_by != current_user["id"]:
+        raise HTTPException(status_code=403, detail="Only the claimant can report this item missing")
 
     reporters: Set[str] = set(post.get("missing_reporters", []))
     if current_user["id"] in reporters:

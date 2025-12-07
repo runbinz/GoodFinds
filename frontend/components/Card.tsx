@@ -7,6 +7,8 @@ interface CardProps {
   posterReputation?: number;
   posterReviewCount?: number;
   onClick?: () => void;
+  currentUserId?: string | null;
+  onReportMissing?: (postId: string) => Promise<void> | void;
 }
 
 const DEFAULT_IMAGE = '/default_img.png';
@@ -50,6 +52,9 @@ export default function Card({ item, posterReputation, posterReviewCount, onClic
             Awaiting Pickup
           </div>
         )}
+
+
+
       </div>
     </div>
   );

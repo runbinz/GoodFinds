@@ -105,7 +105,7 @@ export default function CreatePost({ show, onClose, onCreatePost }: CreatePostPr
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!title.trim() || !location.trim()) return alert('Please fill required fields');
 
