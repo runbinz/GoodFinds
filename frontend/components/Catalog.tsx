@@ -76,7 +76,7 @@ export default function Catalog() {
       matchesSearch &&
       matchesCategory &&
       matchesCondition &&
-      (p.status === 'available' || p.status === 'claimed')
+      (p.status === 'available')
     );
   });
 
