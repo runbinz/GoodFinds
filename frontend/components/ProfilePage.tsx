@@ -150,15 +150,13 @@ export default function ProfilePage() {
     const postId = reportMissingPostId;
 
     try {
-      // First report as missing (while still claimed)
+      // Report as missing - this deletes the post (same as pickup)
       await authenticatedPosts.reportMissing(postId);
       
-      // Then unclaim the item
-      await authenticatedPosts.unclaim(postId);
-      
-      // Remove from claimed items immediately
+      // Remove from both lists since item is now deleted
+      setPostedItems(postedItems.filter(item => item.id !== postId));
       setClaimedItems(claimedItems.filter(item => item.id !== postId));
-      alert('Thanks! This item has been unclaimed and reported as missing.');
+      alert('Item reported as missing and removed from listings!');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to report missing';
       alert(msg);
@@ -479,7 +477,7 @@ export default function ProfilePage() {
               <h3 className="text-xl font-bold">Report Item as Missing?</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to report this item as missing? This will hide the listing from the catalog, but the record will still be kept in our system.
+              Are you sure you want to report this item as missing? This will remove the listing from the platform.
             </p>
             <div className="flex gap-3">
               <button

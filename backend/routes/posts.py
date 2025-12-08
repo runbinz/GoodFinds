@@ -270,11 +270,15 @@ async def confirm_pickup(
     
     return {"message": "Item picked up successfully", "post_id": post_id}
 
-@router.patch("/{post_id}/missing", response_model=Post)
+@router.patch("/{post_id}/missing", status_code=200)
 async def report_missing(
     post_id: str,
     current_user: dict = Depends(get_current_user),
 ):
+    """
+    Report item as missing and delete the post (requires authentication).
+    Only the claimant can report an item as missing.
+    """
     posts = get_posts_collection()
 
     try:
@@ -287,7 +291,7 @@ async def report_missing(
         raise HTTPException(status_code=404, detail="Post not found")
     
     if post.get("status") != "claimed":
-        raise HTTPException(status_code=400, detail="Reported missing.")
+        raise HTTPException(status_code=400, detail="Only claimed items can be reported as missing")
     
     # Only the person who claims can report
     claimed_by = post.get("claimed_by")
@@ -297,29 +301,13 @@ async def report_missing(
     if claimed_by != current_user["id"]:
         raise HTTPException(status_code=403, detail="Only the claimant can report this item missing")
 
-    reporters: Set[str] = set(post.get("missing_reporters", []))
-    if current_user["id"] in reporters:
-        # User already reported this item, return current state
-        updated = await posts.find_one({"_id": oid})
-    else:
-        reporters.add(current_user["id"])
-        new_missing_count = int(post.get("missing_count", 0)) + 1
-
-        update_doc = {
-            "missing_reporters": list(reporters),
-            "missing_count": new_missing_count,
-            "claimed_by": None,
-            "status": "available",
-        }
-        if new_missing_count >= MISSING_THRESHOLD:
-            update_doc["status"] = "removed"
-
-        result = await posts.update_one({"_id": oid}, {"$set": update_doc})
-        print(f"📝 Update result - modified_count: {result.modified_count}, matched_count: {result.matched_count}")
-        updated = await posts.find_one({"_id": oid})
-        print(f"📝 After update - claimed_by: {updated.get('claimed_by')}, status: {updated.get('status')}, missing_reporters: {updated.get('missing_reporters')}")
-
-    return post_to_response(updated)
+    # Delete the post (same behavior as pickup)
+    result = await posts.delete_one({"_id": oid})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete post")
+    
+    return {"message": "Item reported as missing and removed", "post_id": post_id}
 
 
 @router.delete("/{post_id}", status_code=204)
