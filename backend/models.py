@@ -23,8 +23,6 @@ class Post(BaseModel):
     location: str
     claimed_by: Optional[str] = None
     status: str
-    missing_count: int = 0
-    missing_reporters: List[str] = []
 
 
 class Review(BaseModel):
@@ -76,28 +74,8 @@ class UpdatePostRequest(BaseModel):
     location: Optional[str] = None
 
 
-class ClaimPostRequest(BaseModel):
-    pass
-
-
 class CreateReviewRequest(BaseModel):
     poster_id: str
     post_id: str
     rating: float = Field(..., ge=1.0, le=5.0)
     comment: Optional[str] = None
-
-
-class UserResponse(BaseModel):
-    id: str
-    username: str
-    email: str
-    reputation: float
-    review_count: int
-
-
-class MessageResponse(BaseModel):
-    message: str
-    
-    
-class ErrorResponse(BaseModel):
-    detail: str

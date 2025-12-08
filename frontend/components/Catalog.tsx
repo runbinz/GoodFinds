@@ -6,11 +6,9 @@ import Card from './Card';
 import SearchBar from './SearchBar';
 import CreatePost from './CreatePost';
 import UserProfileModal from './UserProfileModal';
-import { Post, User } from '@/types';
+import { Post, User, categories } from '@/types';
 import { publicPostsAPI, publicUsersAPI, useAuthenticatedPosts } from './api';
 import { CreatePostData } from './api';
-
-const categories = ['All', 'Furniture', 'Electronics', 'Clothing', 'Books', 'Other'];
 
 const DEFAULT_IMAGE = '/default_img.png';
 
@@ -136,8 +134,6 @@ export default function Catalog() {
       alert('Please sign in to create posts');
       return;
     }
-
-    console.log('Creating post with data:', newItem);
 
     try {
       const createdPost = await authenticatedPosts.create(newItem);
@@ -278,16 +274,6 @@ export default function Catalog() {
               <div className="mb-4 p-3 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
                 <p className="font-semibold">This item has been claimed</p>
                 <p className="text-sm mt-1">Awaiting pickup by the claimer</p>
-                {selectedItem.missing_reporters && selectedItem.missing_reporters.length > 0 && (
-                  <p className="text-sm mt-2 text-red-600 font-semibold">Users have reported this item as missing</p>
-                )}
-              </div>
-            )}
-
-            {selectedItem.status === 'available' && selectedItem.missing_reporters && selectedItem.missing_reporters.length > 0 && (
-              <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200">
-                <p className="font-semibold">Reported Missing</p>
-                <p className="text-sm mt-1">This item was reported as missing. The previous claimer unclaimed it.</p>
               </div>
             )}
 

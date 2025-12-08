@@ -1,18 +1,5 @@
 // Type definitions for GoodFinds
 
-export interface Item {
-  id: string;
-  name: string;
-  category: string;
-  description?: string;
-  images?: string[];
-  condition?: string;
-  location?: string;
-  claimed: boolean;
-  ownerId: string;
-  claimedBy?: string;
-}
-
 export interface Review {
   id: string;
   reviewer_id: string;
@@ -41,21 +28,15 @@ export interface Post {
   category?: string;
   condition: string;
   location: string;
-  missing_count?: number;
-  missing_reporters?: string[];
-  // status: string;
   status: 'available' | 'claimed' | 'removed';
-  // claimed_by?: string;
   claimed_by?: string | null;
 }
 
 export const categories = [
   'All',
-  'Electronics',
   'Furniture',
+  'Electronics',
   'Clothing',
   'Books',
-  'Toys',
-  'Sports',
   'Other'
 ];
