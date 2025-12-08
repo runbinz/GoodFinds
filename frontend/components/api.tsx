@@ -125,8 +125,8 @@ export function useAuthenticatedPosts() {
     },
 
     // Report missing (user ID comes from auth token)
-    reportMissing: async (postId: string): Promise<Post> => {
-      return authenticatedRequest<Post>(`/posts/${postId}/missing`, {
+    reportMissing: async (postId: string): Promise<{ message: string; post_id: string }> => {
+      return authenticatedRequest<{ message: string; post_id: string }>(`/posts/${postId}/missing`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),

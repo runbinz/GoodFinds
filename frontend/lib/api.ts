@@ -59,6 +59,11 @@ export function useAuthenticatedAPI() {
       throw new Error(error.detail || 'API request failed');
     }
     
+    // Handle 204 No Content responses (e.g., DELETE requests)
+    if (response.status === 204) {
+      return undefined as T;
+    }
+    
     return response.json();
   } 
   return { authenticatedRequest };

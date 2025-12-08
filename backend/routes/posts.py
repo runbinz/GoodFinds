@@ -1,16 +1,28 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from bson import ObjectId
 from pydantic import BaseModel
-from typing import List, Optional, Set
+from typing import List, Optional
 from datetime import datetime
 from db import get_posts_collection
 from models import Post, CreatePostRequest, UpdatePostRequest
 from auth import get_current_user
+from utils import post_doc_to_model
 
 router = APIRouter(prefix="/posts", tags=["posts"])
 
-# automatically taken down after being reported three times
-MISSING_THRESHOLD = 3
+
+async def get_post_by_id(post_id: str):
+    """Helper function to get a post by ID with validation"""
+    posts = get_posts_collection()
+    try:
+        post = await posts.find_one({"_id": ObjectId(post_id)})
+    except:
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    return post
 
 
 # Request models
@@ -31,25 +43,6 @@ class UpdatePostRequest(BaseModel):
     location: Optional[str] = None
 
 
-def post_to_response(post_doc) -> Post:
-    """Convert MongoDB post document into response model"""
-    return Post(
-        id=str(post_doc["_id"]),
-        item_title=post_doc["item_title"],
-        description=post_doc.get("description"),
-        owner_id=post_doc["owner_id"],
-        created_at=post_doc["created_at"],
-        images=post_doc.get("images", []),
-        category=post_doc.get("category"),
-        condition=post_doc["condition"],
-        location=post_doc["location"],
-        claimed_by=post_doc.get("claimed_by"),
-        status=post_doc["status"],
-        missing_count=post_doc.get("missing_count", 0),
-        missing_reporters=post_doc.get("missing_reporters", []),
-    )
-
-
 @router.get("", response_model=List[Post])
 async def get_all_posts(
     category: Optional[str] = Query(None),
@@ -67,7 +60,7 @@ async def get_all_posts(
     cursor = posts.find(query).sort("created_at", -1)
     posts_list = await cursor.to_list(length=None)
     
-    return [post_to_response(post) for post in posts_list]
+    return [post_doc_to_model(post) for post in posts_list]
 
 
 @router.post("", response_model=Post, status_code=201)
@@ -94,23 +87,14 @@ async def create_post(
     result = await posts.insert_one(post_doc)
     post_doc["_id"] = result.inserted_id
 
-    return post_to_response(post_doc)
+    return post_doc_to_model(post_doc)
 
 
 @router.get("/{post_id}", response_model=Post)
 async def get_post(post_id: str):
     """Get a single post by ID"""
-    posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    
-    return post_to_response(post)
+    post = await get_post_by_id(post_id)
+    return post_doc_to_model(post)
 
 
 @router.post("/{post_id}/claim", response_model=Post)
@@ -119,15 +103,8 @@ async def claim_post(
     current_user: dict = Depends(get_current_user)
 ):
     """Claim a post (requires authentication)"""
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     # Prevent users from claiming their own posts
     if post["owner_id"] == current_user["id"]:
@@ -145,7 +122,7 @@ async def claim_post(
         raise HTTPException(status_code=500, detail="Failed to claim post")
     
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
-    return post_to_response(updated_post)
+    return post_doc_to_model(updated_post)
 
 
 @router.post("/{post_id}/unclaim", response_model=Post)
@@ -154,15 +131,8 @@ async def unclaim_post(
     current_user: dict = Depends(get_current_user)
 ):
     """Unclaim a post (requires authentication, only claimer can unclaim)"""
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     # Only the claimer can unclaim the post
     if post.get("claimed_by") != current_user["id"]:
@@ -180,7 +150,7 @@ async def unclaim_post(
         raise HTTPException(status_code=500, detail="Failed to unclaim post")
     
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
-    return post_to_response(updated_post)
+    return post_doc_to_model(updated_post)
 
 
 @router.put("/{post_id}", response_model=Post)
@@ -190,15 +160,8 @@ async def update_post(
     current_user: dict = Depends(get_current_user)
 ):
     """Update a post (requires authentication, only owner can edit)"""
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     # Only the owner can edit their post
     if post["owner_id"] != current_user["id"]:
@@ -232,7 +195,7 @@ async def update_post(
     )
     
     updated_post = await posts.find_one({"_id": ObjectId(post_id)})
-    return post_to_response(updated_post)
+    return post_doc_to_model(updated_post)
 
 
 @router.post("/{post_id}/pickup", status_code=200)
@@ -244,15 +207,8 @@ async def confirm_pickup(
     Confirm item pickup and delete the post (requires authentication).
     Can be confirmed by either the poster (owner) or the claimer.
     """
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     # Only claimed posts can be marked as picked up
     if post["status"] != "claimed":
@@ -270,24 +226,20 @@ async def confirm_pickup(
     
     return {"message": "Item picked up successfully", "post_id": post_id}
 
-@router.patch("/{post_id}/missing", response_model=Post)
+@router.patch("/{post_id}/missing", status_code=200)
 async def report_missing(
     post_id: str,
     current_user: dict = Depends(get_current_user),
 ):
+    """
+    Report item as missing and delete the post (requires authentication).
+    Only the claimant can report an item as missing.
+    """
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-
-    try:
-        oid = ObjectId(post_id)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-
-    post = await posts.find_one({"_id": oid})
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     if post.get("status") != "claimed":
-        raise HTTPException(status_code=400, detail="Reported missing.")
+        raise HTTPException(status_code=400, detail="Only claimed items can be reported as missing")
     
     # Only the person who claims can report
     claimed_by = post.get("claimed_by")
@@ -297,29 +249,13 @@ async def report_missing(
     if claimed_by != current_user["id"]:
         raise HTTPException(status_code=403, detail="Only the claimant can report this item missing")
 
-    reporters: Set[str] = set(post.get("missing_reporters", []))
-    if current_user["id"] in reporters:
-        # User already reported this item, return current state
-        updated = await posts.find_one({"_id": oid})
-    else:
-        reporters.add(current_user["id"])
-        new_missing_count = int(post.get("missing_count", 0)) + 1
-
-        update_doc = {
-            "missing_reporters": list(reporters),
-            "missing_count": new_missing_count,
-            "claimed_by": None,
-            "status": "available",
-        }
-        if new_missing_count >= MISSING_THRESHOLD:
-            update_doc["status"] = "removed"
-
-        result = await posts.update_one({"_id": oid}, {"$set": update_doc})
-        print(f"📝 Update result - modified_count: {result.modified_count}, matched_count: {result.matched_count}")
-        updated = await posts.find_one({"_id": oid})
-        print(f"📝 After update - claimed_by: {updated.get('claimed_by')}, status: {updated.get('status')}, missing_reporters: {updated.get('missing_reporters')}")
-
-    return post_to_response(updated)
+    # Delete the post (same behavior as pickup)
+    result = await posts.delete_one({"_id": ObjectId(post_id)})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to delete post")
+    
+    return {"message": "Item reported as missing and removed", "post_id": post_id}
 
 
 @router.delete("/{post_id}", status_code=204)
@@ -328,15 +264,8 @@ async def delete_post(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a post (requires authentication, only owner can delete)"""
+    post = await get_post_by_id(post_id)
     posts = get_posts_collection()
-    
-    try:
-        post = await posts.find_one({"_id": ObjectId(post_id)})
-    except:
-        raise HTTPException(status_code=400, detail="Invalid post ID")
-    
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
     
     # Only the owner can delete their post
     if post["owner_id"] != current_user["id"]:

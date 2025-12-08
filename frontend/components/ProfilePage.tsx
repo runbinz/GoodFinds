@@ -27,6 +27,7 @@ export default function ProfilePage() {
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [itemToReview, setItemToReview] = useState<Post | null>(null);
   const [reportMissingPostId, setReportMissingPostId] = useState<string | null>(null);
+  const [wantToReview, setWantToReview] = useState(false);
 
 
   useEffect(() => {
@@ -108,14 +109,16 @@ export default function ProfilePage() {
     // Close the pickup confirmation modal
     setPickupPostId(null);
     
-    // Only show review form if user is the claimer (not the poster)
-    if (claimedItem && itemForReview) {
+    // Only show review form if user is the claimer AND they want to leave a review
+    if (claimedItem && itemForReview && wantToReview) {
       // Show review form BEFORE deleting the post
       setItemToReview(itemForReview);
       setShowReviewForm(true);
+      setWantToReview(false); // Reset for next time
     } else {
-      // If poster is confirming, delete immediately (no review needed)
+      // If poster is confirming or user doesn't want to review, delete immediately
       await deletePostAfterPickup(postId);
+      setWantToReview(false); // Reset for next time
     }
   };
 
@@ -150,15 +153,13 @@ export default function ProfilePage() {
     const postId = reportMissingPostId;
 
     try {
-      // First report as missing (while still claimed)
+      // Report as missing - this deletes the post (same as pickup)
       await authenticatedPosts.reportMissing(postId);
       
-      // Then unclaim the item
-      await authenticatedPosts.unclaim(postId);
-      
-      // Remove from claimed items immediately
+      // Remove from both lists since item is now deleted
+      setPostedItems(postedItems.filter(item => item.id !== postId));
       setClaimedItems(claimedItems.filter(item => item.id !== postId));
-      alert('Thanks! This item has been unclaimed and reported as missing.');
+      alert('Item reported as missing and removed from listings!');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to report missing';
       alert(msg);
@@ -448,9 +449,24 @@ export default function ProfilePage() {
               </div>
               <h3 className="text-xl font-bold">Confirm Pickup</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 mb-4">
               Has this item been picked up? This will remove the listing from the platform.
             </p>
+            {claimedItems.some(item => item.id === pickupPostId) && (
+              <div className="mb-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={wantToReview}
+                    onChange={(e) => setWantToReview(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <span className="text-sm text-gray-700">
+                    I'd like to leave a review for the poster (optional)
+                  </span>
+                </label>
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => handleConfirmPickup(pickupPostId)}
@@ -459,7 +475,10 @@ export default function ProfilePage() {
                 Yes, Item Picked Up
               </button>
               <button
-                onClick={() => setPickupPostId(null)}
+                onClick={() => {
+                  setPickupPostId(null);
+                  setWantToReview(false);
+                }}
                 className="flex-1 bg-gray-200 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
               >
                 Cancel
@@ -479,7 +498,7 @@ export default function ProfilePage() {
               <h3 className="text-xl font-bold">Report Item as Missing?</h3>
             </div>
             <p className="text-gray-600 mb-6">
-              Are you sure you want to report this item as missing? This will hide the listing from the catalog, but the record will still be kept in our system.
+              Are you sure you want to report this item as missing? This will remove the listing from the platform.
             </p>
             <div className="flex gap-3">
               <button
